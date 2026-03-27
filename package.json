@@ -1,0 +1,57 @@
+{
+  "name": "amplify-audit",
+  "version": "0.1.0",
+  "description": "Audit any product listing. Get quality scores, return risk analysis, and AI-powered improvement recommendations.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "amplify-audit": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node --test test/*.test.js",
+    "prepublishOnly": "npm run build",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "ecommerce",
+    "product-listing",
+    "amazon",
+    "shopify",
+    "audit",
+    "seo",
+    "returns",
+    "quality",
+    "pdp",
+    "listing-optimization",
+    "return-analysis",
+    "catalog"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Vatsal2006350/amplify-audit.git"
+  },
+  "homepage": "https://github.com/Vatsal2006350/amplify-audit#readme",
+  "bugs": {
+    "url": "https://github.com/Vatsal2006350/amplify-audit/issues"
+  },
+  "author": "Amplify <hello@use-amplify.com> (https://use-amplify.com)",
+  "license": "MIT",
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}
