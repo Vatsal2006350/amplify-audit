@@ -25,10 +25,12 @@ Our evaluation on [N] product listings across [M] Shopify and Amazon brands demo
 - **Key insight**: Most return-driving issues are *fixable* through better product descriptions — this is a content problem, not a logistics problem
 
 ### 1.2 Limitations of Current Approaches
-- **Rule-based validators** (Google Merchant, Amazon IDQ): Check field completeness but miss semantic issues
+- **Rule-based validators** (Google Merchant, Amazon IDQ, Walmart CQS): Check field completeness but miss semantic issues — e.g., a listing can score 100% on completeness while having a misleading size chart
 - **LLM analyzers** (GPT wrappers): Analyze listings in isolation, cannot reason about brand patterns or category norms
-- **PIM systems** (Salsify, Akeneo): Focus on data management, not quality optimization
+- **PIM systems** (Salsify, Akeneo, Pimcore): Focus on data management, not quality optimization
+- **No open-source product listing linter exists**: After extensive survey, no dedicated open-source tool checks product titles, descriptions, images, pricing, and metadata for quality and SEO compliance — a clear ecosystem gap
 - **No tool models the inherent graph structure** of product catalogs (products ↔ brands ↔ categories ↔ evidence)
+- **No unified framework connects listing quality to return rates**: Papers study return prediction OR listing quality in isolation; connecting "bad listing feature X causes return reason Y" is largely unexplored
 
 ### 1.3 Our Approach: Data-Spatial Analysis
 - Model catalogs as typed property graphs
@@ -38,9 +40,10 @@ Our evaluation on [N] product listings across [M] Shopify and Amazon brands demo
 
 ### 1.4 Contributions
 1. **DSPQA Framework**: First application of Object-Spatial Programming to e-commerce catalog quality, with formal definitions of the quality analysis graph and walker semantics
-2. **Graph-Aware Scoring Model**: Composite scoring function that incorporates information-theoretic metrics (Shannon entropy for reason concentration) and graph neighborhood context
-3. **Meaning-Typed Quality Assessment**: Demonstration of how Jac's `by llm()` mechanism enables type-safe LLM analysis with structured output validation
-4. **Open-Source Implementation**: Production-quality tool with 7 Jac modules, 6 specialized walkers, and comprehensive test suite
+2. **Graph-Aware Scoring Model**: Composite scoring function that incorporates information-theoretic metrics (Shannon entropy for reason concentration) and graph neighborhood context — connecting listing quality signals to return rate prediction
+3. **Meaning-Typed Quality Assessment**: Demonstration of how Jac's `by llm()` mechanism enables type-safe LLM analysis with structured output validation, eliminating prompt engineering
+4. **Hybrid NLP + Rule-Based Quality Scoring**: Systematic comparison and combination of rule-based checks (structural completeness) with LLM-based semantic assessment — showing NLP catches issues rules miss (misleading descriptions) while rules catch issues NLP misses (missing GTIN, wrong image count)
+5. **Open-Source Implementation**: First dedicated open-source product listing linter — 8 Jac modules, 6 specialized walkers, and comprehensive test suite
 
 ---
 
@@ -60,18 +63,29 @@ Our evaluation on [N] product listings across [M] Shopify and Amazon brands demo
 - Semantic strings (`sem`) for disambiguation
 
 ### 2.3 E-Commerce Product Knowledge Graphs
-- Amazon AutoKnow (Dong et al., 2020)
-- Walmart Retail Graph
-- KDD 2021 Product Knowledge Graph tutorial
-- Billion-scale e-commerce knowledge graphs (Alibaba, JD.com)
-- **Gap**: These model product data but not quality analysis
+- Amazon AutoKnow (Dong et al., KDD 2020): Self-driving knowledge collection — auto product type, attribute values, error correction
+- Walmart Retail Graph: Bipartite graph (products ↔ entities) powering semantic search and recommendations
+- Billion-scale Pre-trained E-commerce Product Knowledge Graph Model (IEEE 2021): Pre-trained embeddings for billion-scale product graphs
+- KDD 2021 Product Knowledge Graph tutorial (Amazon Product Graph Team)
+- AliCoCo (Alibaba): Large-scale e-commerce concept graph
+- **Gap**: These model product data structure but not quality analysis pipelines — no graph reasons about *why* a listing is bad
 
 ### 2.4 Listing Quality in Practice
-- Amazon Item Data Quality (IDQ) score
-- Walmart Content Quality Score
-- Jungle Scout Listing Quality Score
-- Google Merchant feed validation
-- **Gap**: All are closed-source, proprietary, and flat (no graph reasoning)
+- Amazon Item Data Quality (IDQ) score: 0-100, silently impacts search rankings, "Frequently Bought Together" placement, Lightning Deal eligibility
+- Walmart Content Quality Score: 0-100 across content, discoverability, offer, ratings/reviews; higher scores rank favorably
+- Jungle Scout LQS: 1-10 evaluating title length, keyword richness, bullet points, description, photo count/resolution
+- Google Merchant feed validation: XML schema checks, structured data validators
+- Academic frameworks evaluate: completeness, accuracy, consistency, validity, uniqueness, compliance (WisePIM 2024)
+- **Gap**: All are closed-source, proprietary, and flat (no graph reasoning). No open-source equivalent exists
+
+### 2.5 Return Rate Prediction and NLP for E-Commerce
+- Urbanke et al. (2015): Mahalanobis feature extraction for return prediction on 1.14M purchases
+- HyperGo (2024): CNN-LSTM hybrid achieving 97.67% accuracy for return prediction
+- ACL ECNLP Workshop (2024): First comprehensive study predicting return *reasons* across multiple domains
+- QLeBERT (Ullah et al., 2023): Combines quality-related lexicon, N-grams, BERT, and BiLSTM for quality classification
+- PRAISE (2025): LLM-driven structured insights for addressing incomplete/inaccurate seller descriptions on Amazon
+- ModICT (2024): Multimodal in-context tuning combining images + marketing keywords for product descriptions
+- **Gap**: These study returns OR listing quality in isolation — no framework connects listing features to return causes
 
 ---
 
@@ -264,32 +278,52 @@ This is impossible in flat analysis tools.
 
 ---
 
-## 6. Related Work (~1.5 pages)
+## 6. Related Work (~2 pages)
 
 ### 6.1 Product Knowledge Graphs
-- AutoKnow (Amazon, Dong et al. 2020): automatic product knowledge graph construction
+- AutoKnow (Amazon, Dong et al., KDD 2020): automatic product knowledge graph construction from taxonomy, user logs, and catalog data
+- Walmart Retail Graph: bipartite graph with products and related entities powering semantic search and recommendations
+- Billion-scale Pre-trained E-commerce Product KG Model (IEEE 2021): pre-trained embeddings for billion-scale product graphs, tested on classification, deduplication, and recommendation
 - AliCoCo (Alibaba): large-scale e-commerce concept graph
-- Product Knowledge Graph tutorial (KDD 2021)
-- **Distinction**: These model product data, not quality analysis pipelines
+- KDD 2021 Tutorial: "All You Need to Know to Build a Product Knowledge Graph" (Amazon Product Graph Team)
+- KDD 2020 Workshop on Knowledge Graphs & E-Commerce (Walmart, Amazon, Home Depot)
+- **Distinction**: These model product data structure, not quality analysis pipelines. We model quality signals (issues, evidence, recommendations) as first-class graph citizens
 
 ### 6.2 NLP for E-Commerce
-- BERT/GPT for product description generation (arXiv 2024)
-- PRAISE: LLM-driven structured insights for product descriptions (arXiv 2025)
-- LLMs in e-commerce: comparative analysis (ScienceDirect 2024)
-- **Distinction**: These generate content; we analyze and score existing content
+- QLeBERT (Ullah et al., 2023): quality-related lexicon + BERT + BiLSTM for product quality classification
+- PRAISE (arXiv 2025): LLM-driven structured insights for incomplete/inaccurate seller descriptions on Amazon
+- ModICT (2024): multimodal in-context tuning combining images + marketing keywords; +3.3% Rouge-L, +9.4% diversity
+- Investigating LLM Applications in E-Commerce (arXiv 2024): finds fine-tuning smaller models often outperforms few-shot with large LLMs
+- Automated Product Description Generation via Vision-Language Models (Stanford CS231N, 2024): compares CLIP-GPT2, OFA, BLIP-2
+- "Unveiling Dual Quality in Product Reviews" (2025): SetFit + sentence-transformers for quality inconsistencies; 1,957-review dataset
+- "A Critical Assessment of Consumer Reviews" (2022): uses Shannon's Entropy Theory for review quality metrics
+- **Distinction**: These generate or classify content; we analyze and score existing listings with graph-aware context and produce actionable fixes
 
-### 6.3 Data Quality in E-Commerce
-- Google Merchant Feed Validation
-- Great Expectations, Soda Core (general data quality)
-- Walmart Content Quality Score, Amazon IDQ
-- **Distinction**: These are rule-based validators; we combine rules + graph + LLM
+### 6.3 Return Rate Prediction
+- Urbanke et al. (2015): Mahalanobis feature extraction for return prediction on 1.14M purchases from German retailer
+- HyperGo Framework (2024): CNN-LSTM hybrid achieving 97.67% accuracy for return prediction
+- "Predicting Returns Even Before Purchase in Fashion E-Commerce" (2019): hybrid dual-model (DNN); A/B test on 100K users showed 3% return reduction
+- "Learning Reasons for Product Returns on E-Commerce" (ACL ECNLP Workshop, 2024): first comprehensive study predicting return *reasons* across multiple domains
+- "Forecasting E-Commerce Consumer Returns" (2024): systematic review of 25 publications; identifies product reviews/sentiment as promising predictors
+- **Distinction**: These predict returns from purchase/behavioral data; we identify *fixable listing content* that drives returns
 
-### 6.4 Programming Language Paradigms
-- Object-Spatial Programming (Jac/Jaseci)
-- Meaning-Typed Programming (MTP, arXiv 2024)
-- Compiler-driven cache coherence (Mars et al., our reference paper)
+### 6.4 Data Quality Tools and Frameworks
+- Amazon IDQ Score: 0-100, impacts search rankings and Lightning Deal eligibility
+- Walmart Content Quality Score: 0-100, evaluates content, discoverability, offer, ratings/reviews
+- Google Merchant feed validation: XML schema checks
+- Great Expectations, Soda Core: general-purpose data quality frameworks (adaptable but not e-commerce-specific)
+- Spectral (Stoplight): JSON/YAML linter with custom rulesets
+- Open-source PIMs: Pimcore, Akeneo, AtroPIM — data management, not quality scoring
+- **Distinction**: Platform tools are closed-source and rule-based only; general frameworks lack e-commerce domain knowledge; no open-source listing linter exists. We combine rules + graph + LLM in an open-source tool
+
+### 6.5 Programming Language Paradigms
+- Object-Spatial Programming (Jac/Jaseci, arXiv 2023): computation travels to data via walkers traversing node/edge graphs
+- "The Case for a Wholistic Serverless Programming Paradigm" (2022): graph-native programming for reasoning about data
+- Meaning-Typed Programming (MTP, arXiv 2024): `by llm()` as language primitive; developers complete tasks 3.2x faster with 45% fewer LOC
+- LLM-Based Multi-Agent Systems (IEEE ICEBE 2025): LLM-powered agents simulating consumer decisions
+- Agentic LLMs in Supply Chain (Int. J. Production Research, 2025): autonomous consensus-seeking agents
 - Agent-based modeling (NetLogo, Mesa)
-- **Distinction**: We apply OSP to a new domain (e-commerce quality)
+- **Distinction**: We apply OSP + MTP to a new domain (e-commerce quality) and demonstrate that the walker/graph model naturally expresses catalog quality workflows
 
 ---
 
@@ -306,18 +340,41 @@ This is impossible in flat analysis tools.
 - No brittle prompt strings; the compiler generates prompts from types
 - MockLLM enables deterministic testing
 
-### 7.3 Limitations
-- Graph construction requires product data ingestion (web scraping is the bottleneck)
-- LLM analysis adds latency and cost
-- Keyword classifier has inherent recall limits
-- Graph persistence not leveraged in current implementation
+### 7.3 Industry Context: The Build-vs-Buy Landscape
+- Major brands (Nike, Adidas, Warby Parker, Allbirds) invest heavily in product data infrastructure but build internal, proprietary solutions
+- Nike acquired Datalogue, Zodiac, Select for unified product/customer data; RFID across all footwear/apparel
+- Adidas moved to microservices/micro-frontends, piloted GitHub Copilot across 500 engineers (20-25% efficiency gains)
+- Warby Parker uses 168 technologies with custom "Point of Everything" headless commerce platform
+- 91% of IT decision-makers believe they need to improve data quality (Syncari 2024)
+- SMBs lack the engineering resources of these brands — an open-source listing linter fills a real gap
+- Enterprise PIM market (Inriver, Pimcore, Akeneo) focuses on data management, not quality optimization
 
-### 7.4 Future Work
-- Persistent product graphs with `jac start` (server mode)
-- Temporal analysis: track quality changes over time
+### 7.4 Limitations
+- Graph construction requires product data ingestion (web scraping is the bottleneck)
+- LLM analysis adds latency (~2-5s per product) and cost (~$0.01 per product via Claude)
+- Keyword classifier has inherent recall limits (98 keywords across 5 categories)
+- Graph persistence not leveraged in current implementation (in-memory only)
+- Evaluation uses synthetic return reasons based on published statistics, not real merchant data
+
+### 7.5 Future Work
+- Persistent product graphs with `jac start` (server mode) for incremental analysis
+- Temporal analysis: track quality changes over time, measure fix impact
 - Cross-merchant benchmarking via shared category norms
-- Image analysis via multimodal `by llm()` (already supported in Jac)
-- Integration with Shopify/Amazon APIs for automated PDP updates
+- Image analysis via multimodal `by llm()` (already supported in Jac) — detecting misleading product photos
+- Integration with Shopify/Amazon APIs for automated PDP updates (close the loop)
+- Pre-purchase return prediction: use listing quality signals to predict return rates before products go live
+- Multi-agent extension: leverage Jac's walker architecture for specialized agents (pricing, inventory, competitive) as demonstrated in the companion Amplify platform
+
+---
+
+### 7.6 Why This Work Is Novel (Positioning Statement)
+
+The research gap is clear across four dimensions:
+
+1. **No open-source product listing linter exists.** Major brands build internal solutions; SMBs rely on expensive SaaS tools or platform-native checks.
+2. **No unified framework connects listing quality to return rates.** Papers study return prediction OR listing quality in isolation. Connecting "bad listing feature X causes return reason Y" via graph topology is unexplored.
+3. **Multi-agent and graph-based approaches are validated in adjacent domains** (supply chain, financial trading, general knowledge graphs) but have not been applied to product listing auditing.
+4. **The NLP vs. rule-based comparison for listing quality is undocumented.** Platforms use rule-based scoring; academic research focuses on NLP for reviews/descriptions. No paper systematically compares and combines both for holistic listing quality assessment.
 
 ---
 
@@ -333,15 +390,51 @@ The tool is open-source, works across Shopify and Amazon, and can be extended wi
 
 ## References
 
-1. National Retail Federation. "Consumer Returns in the Retail Industry 2024."
-2. Mars, J. et al. "Jac: A Language for Object-Spatial Programming." [Jaseci paper]
-3. Mars, J. et al. "Meaning-Typed Programming." arXiv:2405.08965, 2024.
+### Core Framework
+1. Mars, J. et al. "The Jaseci Programming Paradigm and Runtime Stack." arXiv:2305.09864, 2023.
+2. Mars, J. et al. "Meaning-Typed Programming." arXiv:2405.08965, 2024.
+3. Mars, J. et al. "The Case for a Wholistic Serverless Programming Paradigm and Full Stack Automation for AI and Beyond." 2022.
 4. Mars, J. et al. "Compiler-Driven Cache Coherence for Full-Stack Applications via Cross-Boundary Static Analysis." [Reference paper]
-5. Dong, X. et al. "AutoKnow: Self-Driving Knowledge Collection for Products." KDD 2020.
-6. Amazon. "Item Data Quality (IDQ) Score." Seller Central Documentation.
-7. Walmart. "Content Quality Score." Marketplace Documentation.
-8. Teikametrics. "Understanding Listing Quality Scores." 2024.
-9. Shannon, C. "A Mathematical Theory of Communication." 1948.
-10. Various. "Investigating LLM Applications in E-Commerce." arXiv:2408.12779, 2024.
-11. Various. "PRAISE: Enhancing Product Descriptions with LLM-Driven Structured Insights." arXiv:2506.17314, 2025.
-12. WisePIM. "Product Validation Scoring Framework." 2024.
+
+### E-Commerce Returns and Industry
+5. National Retail Federation. "Consumer Returns in the Retail Industry 2024."
+6. Shannon, C. "A Mathematical Theory of Communication." Bell System Technical Journal, 1948.
+
+### Product Knowledge Graphs
+7. Dong, X. et al. "AutoKnow: Self-Driving Knowledge Collection for Products of Thousands of Types." KDD 2020.
+8. Walmart Global Tech. "Retail Graph: Walmart's Product Knowledge Graph." 2021.
+9. "Billion-scale Pre-trained E-commerce Product Knowledge Graph Model." IEEE, 2021. arXiv:2105.00388.
+10. "All You Need to Know to Build a Product Knowledge Graph." KDD 2021 Tutorial.
+11. "KDD 2020 Workshop on Knowledge Graphs and E-Commerce." USC ISI.
+
+### NLP for E-Commerce
+12. Ullah, I. et al. "QLeBERT: Assessing Product Quality in E-Commerce." 2023.
+13. "PRAISE: Enhancing Product Descriptions with LLM-Driven Structured Insights." arXiv:2506.17314, 2025.
+14. "ModICT: Multimodal In-Context Tuning for Product Description Generation." arXiv:2402.13587, 2024.
+15. "Investigating LLM Applications in E-Commerce." arXiv:2408.12779, 2024.
+16. "Automated Product Description Generation via Vision-Language Models." Stanford CS231N, 2024.
+17. "Unveiling Dual Quality in Product Reviews: An NLP-Based Approach." 2025.
+18. "A Critical Assessment of Consumer Reviews: A Hybrid NLP-Based Methodology." 2022.
+
+### Return Rate Prediction
+19. Urbanke, P. et al. "Predicting Product Returns in E-Commerce: The Contribution of Mahalanobis Feature Extraction." 2015.
+20. "HyperGo Framework." CNN-LSTM hybrid for return prediction. 2024.
+21. "Predicting Returns Even Before Purchase in Fashion E-Commerce." arXiv:1906.12128, 2019.
+22. "Learning Reasons for Product Returns on E-Commerce." ACL ECNLP Workshop, 2024.
+23. "Forecasting E-Commerce Consumer Returns: A Systematic Literature Review." Springer, 2024.
+24. "Return Management: A Machine Learning Approach." 2024.
+
+### Listing Quality Scoring
+25. Amazon. "Item Data Quality (IDQ) Score." Seller Central Documentation.
+26. Walmart. "Content Quality Score." Marketplace Documentation.
+27. Teikametrics. "Understanding Listing Quality Scores." 2024.
+28. WisePIM. "Product Validation Scoring Framework." 2024.
+
+### Multi-Agent Systems
+29. "LLM-Based Multi-Agent System for Simulating and Analyzing Marketing and Consumer Behavior." IEEE ICEBE, 2025. arXiv:2510.18155.
+30. "Agentic LLMs in the Supply Chain." International Journal of Production Research, 2025.
+31. "A Survey on LLM-based Multi-Agent Systems." arXiv:2412.17481, 2024.
+
+### E-Commerce SEO
+32. "AI's Revolutionary Role in SEO." Springer, 2024.
+33. "Implementing LLMs to Enhance Catalog Accuracy in Retail." 2024.
