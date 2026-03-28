@@ -64,8 +64,8 @@ walker TrendAnalyzer {
         # Track issue co-occurrence
         for (i, cat1) in enumerate(issue_categories) {
             for cat2 in issue_categories[i+1:] {
-                pair = tuple(sorted([cat1, cat2]));
-                pair_key = f"{pair[0]}|{pair[1]}";
+                cats = sorted([cat1, cat2]);
+                pair_key = f"{cats[0]}|{cats[1]}";
                 if pair_key in self.issue_cooccurrence {
                     self.issue_cooccurrence[pair_key] = self.issue_cooccurrence[pair_key] + 1;
                 } else {

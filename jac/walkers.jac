@@ -128,9 +128,14 @@ walker ReturnAnalyzer {
         primary_type = get_primary_issue_type(classification);
         reason_breakdown = build_reason_breakdown(reasons);
 
-        # Compute scores
-        return_rate = compute_return_rate(self.return_count, self.order_count);
-        ticket_rate = compute_ticket_rate(self.ticket_count, self.order_count);
+        # Compute scores — derive from evidence if walker-level counts not set
+        total_evidence = sum(ev.count for ev in evidence_nodes);
+        order_count = self.order_count if self.order_count > 0 else max(total_evidence * 4, 1);
+        return_count = self.return_count if self.return_count > 0 else total_evidence;
+        ticket_count = self.ticket_count;
+
+        return_rate = compute_return_rate(return_count, order_count);
+        ticket_rate = compute_ticket_rate(ticket_count, order_count);
 
         keyword_count = 0;
         for (k, v) in classification.items() {
@@ -140,7 +145,7 @@ walker ReturnAnalyzer {
         sku_health = compute_fixability_score(
             return_rate, ticket_rate, keyword_count, reason_breakdown
         );
-        confidence = compute_confidence(self.order_count, self.return_count);
+        confidence = compute_confidence(order_count, return_count);
 
         # Determine risk level
         risk_level = "LOW";
@@ -225,7 +230,6 @@ walker RecommendationWalker {
 
     can generate with Product entry {
         primary_type = "";
-        return_rate = 0.0;
 
         if here.return_risk {
             primary_type = here.return_risk.primary_issue_type;
@@ -237,6 +241,7 @@ walker RecommendationWalker {
         for ev in evidence_nodes {
             total_returns += ev.count;
         }
+        return_rate = total_returns / max(total_returns * 4, 1) if total_returns > 0 else 0.0;
 
         fixes = generate_recommendations(
             title=here.title,
