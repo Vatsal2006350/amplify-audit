@@ -1,6 +1,6 @@
 {
   "name": "amplify-audit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Audit any product listing. Get quality scores, return risk analysis, and AI-powered improvement recommendations.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -43,8 +43,17 @@
     "commander": "^12.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
-    "@types/node": "^20.0.0"
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.30.0"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=18"

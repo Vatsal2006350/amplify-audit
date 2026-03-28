@@ -2,6 +2,8 @@
 export interface Product {
   url?: string
   platform?: 'shopify' | 'amazon' | 'unknown'
+  /** Where this data came from: 'page' = full product page, 'search' = search result listing */
+  source?: 'page' | 'search'
   title: string
   description: string
   tags: string[]

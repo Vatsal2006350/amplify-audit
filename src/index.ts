@@ -4,7 +4,7 @@
  * Audit any product listing: quality score, return risk, and
  * AI-generated improvement recommendations.
  *
- * https://github.com/amplify-ecommerce/audit
+ * https://github.com/Vatsal2006350/amplify-audit
  */
 
 export type {
@@ -17,7 +17,20 @@ export type {
   AuditReport,
 } from './types'
 
+// Legacy re-export (backward compat)
 export { fetchProduct, detectPlatform } from './fetcher'
+
+// New multi-platform exports
+export {
+  fetchSingleProduct,
+  fetchAmazonSearchProducts,
+  isAmazonSearchUrl,
+  isStoreUrl,
+  buildAmazonSearchUrl,
+} from './product-fetcher'
+export { normalizeStoreUrl, fetchAllProducts } from './store-fetcher'
+export { isAiAvailable, analyzeWithAi, analyzeProductsWithAi } from './ai-analyzer'
+
 export { analyzeListingQuality } from './analyzer'
 export {
   classifyReasons,

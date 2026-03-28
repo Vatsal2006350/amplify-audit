@@ -22,8 +22,9 @@ export function analyzeListingQuality(product: Product): {
   const description = product.description || ''
   const descText = stripHtml(description)
   const tags = product.tags || []
+  const isSearch = product.source === 'search'
 
-  // --- Title checks ---
+  // --- Title checks (always available) ---
   if (!title) {
     issues.push({ type: 'error', category: 'title', message: 'Product title is missing' })
   } else {
@@ -35,62 +36,75 @@ export function analyzeListingQuality(product: Product): {
       issues.push({ type: 'warning', category: 'title', message: `Title is very long (${title.length} chars). Consider trimming to under 150 characters.` })
     }
 
-    // Check for ALL CAPS
     if (title === title.toUpperCase() && title.length > 10) {
       issues.push({ type: 'warning', category: 'title', message: 'Title is in ALL CAPS. Use title case for better readability.' })
     }
+
+    // Title keyword analysis — check for keyword stuffing or missing key info
+    if (title.split(/[,|\/\-]/).length > 6) {
+      issues.push({ type: 'info', category: 'title', message: 'Title may have too many separators. Clean, readable titles convert better.' })
+    }
   }
 
-  // --- Description checks ---
-  if (!descText || descText.length < 10) {
-    issues.push({ type: 'error', category: 'description', message: 'Product description is missing or empty' })
+  // --- Description checks (skip if data came from search results) ---
+  if (!isSearch) {
+    if (!descText || descText.length < 10) {
+      issues.push({ type: 'error', category: 'description', message: 'Product description is missing or empty' })
+    } else {
+      if (descText.length < 100) {
+        issues.push({ type: 'error', category: 'description', message: `Description is too short (${descText.length} chars). Target 300-1000 characters.` })
+      } else if (descText.length < 300) {
+        issues.push({ type: 'warning', category: 'description', message: `Description could be more detailed (${descText.length} chars). Target 300-1000 characters.` })
+      }
+
+      const lowerDesc = descText.toLowerCase()
+
+      const hasSizing = /\b(size|sizing|fit|fits|measurement|dimensions|cm|inches|length|width|small|medium|large|xl)\b/.test(lowerDesc)
+      if (!hasSizing) {
+        issues.push({ type: 'warning', category: 'sizing', message: 'No sizing or fit information found. This is the #1 driver of returns.' })
+      }
+
+      const hasMaterial = /\b(material|fabric|cotton|polyester|leather|wool|linen|silk|nylon|synthetic|organic)\b/.test(lowerDesc)
+      if (!hasMaterial) {
+        issues.push({ type: 'info', category: 'material', message: 'No material/fabric information detected. Adding materials improves buyer confidence.' })
+      }
+
+      const hasCareInstructions = /\b(wash|care|clean|dry|iron|machine wash|hand wash|tumble)\b/.test(lowerDesc)
+      if (!hasCareInstructions) {
+        issues.push({ type: 'info', category: 'care', message: 'No care instructions found. Consider adding washing/maintenance info.' })
+      }
+    }
+  }
+
+  // --- Image checks (search results only have 1 thumbnail — don't penalize) ---
+  if (!isSearch) {
+    if (product.images.length === 0) {
+      issues.push({ type: 'error', category: 'images', message: 'No product images found' })
+    } else if (product.images.length < 3) {
+      issues.push({ type: 'warning', category: 'images', message: `Only ${product.images.length} image(s). Aim for 4+ images with lifestyle and detail shots.` })
+    }
   } else {
-    if (descText.length < 100) {
-      issues.push({ type: 'error', category: 'description', message: `Description is too short (${descText.length} chars). Target 300-1000 characters.` })
-    } else if (descText.length < 300) {
-      issues.push({ type: 'warning', category: 'description', message: `Description could be more detailed (${descText.length} chars). Target 300-1000 characters.` })
-    }
-
-    // Check for missing critical info
-    const lowerDesc = descText.toLowerCase()
-
-    const hasSizing = /\b(size|sizing|fit|fits|measurement|dimensions|cm|inches|length|width|small|medium|large|xl)\b/.test(lowerDesc)
-    if (!hasSizing) {
-      issues.push({ type: 'warning', category: 'sizing', message: 'No sizing or fit information found. This is the #1 driver of returns.' })
-    }
-
-    const hasMaterial = /\b(material|fabric|cotton|polyester|leather|wool|linen|silk|nylon|synthetic|organic)\b/.test(lowerDesc)
-    if (!hasMaterial) {
-      issues.push({ type: 'info', category: 'material', message: 'No material/fabric information detected. Adding materials improves buyer confidence.' })
-    }
-
-    const hasCareInstructions = /\b(wash|care|clean|dry|iron|machine wash|hand wash|tumble)\b/.test(lowerDesc)
-    if (!hasCareInstructions) {
-      issues.push({ type: 'info', category: 'care', message: 'No care instructions found. Consider adding washing/maintenance info.' })
+    if (product.images.length === 0) {
+      issues.push({ type: 'warning', category: 'images', message: 'No product image in listing' })
     }
   }
 
-  // --- Image checks ---
-  if (product.images.length === 0) {
-    issues.push({ type: 'error', category: 'images', message: 'No product images found' })
-  } else if (product.images.length < 3) {
-    issues.push({ type: 'warning', category: 'images', message: `Only ${product.images.length} image(s). Aim for 4+ images with lifestyle and detail shots.` })
+  // --- Tag checks (skip for search results — Amazon doesn't expose tags) ---
+  if (!isSearch) {
+    if (tags.length === 0) {
+      issues.push({ type: 'warning', category: 'tags', message: 'No tags/categories found. Tags improve discoverability.' })
+    } else if (tags.length < 3) {
+      issues.push({ type: 'info', category: 'tags', message: `Only ${tags.length} tag(s). Consider adding more for better discoverability.` })
+    }
   }
 
-  // --- Tag checks ---
-  if (tags.length === 0) {
-    issues.push({ type: 'warning', category: 'tags', message: 'No tags/categories found. Tags improve discoverability.' })
-  } else if (tags.length < 3) {
-    issues.push({ type: 'info', category: 'tags', message: `Only ${tags.length} tag(s). Consider adding more for better discoverability.` })
-  }
-
-  // --- Price check ---
+  // --- Price check (always available) ---
   if (!product.price) {
     issues.push({ type: 'warning', category: 'price', message: 'No price information detected.' })
   }
 
-  // --- Vendor check ---
-  if (!product.vendor) {
+  // --- Vendor check (skip for search results) ---
+  if (!isSearch && !product.vendor) {
     issues.push({ type: 'info', category: 'vendor', message: 'No brand/vendor information. Adding brand name improves trust.' })
   }
 
