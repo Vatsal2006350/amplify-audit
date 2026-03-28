@@ -28,6 +28,12 @@ import from .walkers {
     QualityAnalyzer, ReturnAnalyzer, RecommendationWalker,
     AiEnricher, BrandAggregator, AuditReporter
 }
+import from .seo_analyzer { SEOAnalyzer }
+import from .trend_analyzer { TrendAnalyzer, analyze_trends }
+import from .fetcher { fetch_product, fetch_store, detect_platform }
+import from .export { export_json, export_csv, export_markdown, export_to_file }
+import sys;
+import json;
 
 # ─── Graph Construction ──────────────────────────────────────────────────────
 
@@ -261,35 +267,305 @@ def audit_catalog(
     };
 }
 
-# ─── Entry Point ─────────────────────────────────────────────────────────────
+# ─── CLI Argument Parsing ────────────────────────────────────────────────────
 
-with entry {
+def parse_args() -> dict {
+    """Parse command-line arguments."""
+    args = sys.argv[1:];
+    opts: dict = {
+        "url": "",
+        "store": False,
+        "ai": False,
+        "seo": True,
+        "format": "text",
+        "output": "",
+        "max_products": 50,
+        "min_score": 0,
+        "returns_file": "",
+        "help": False
+    };
+
+    i = 0;
+    while i < len(args) {
+        arg = args[i];
+        if arg in ["--help", "-h"] {
+            opts["help"] = True;
+        } elif arg in ["--ai", "-a"] {
+            opts["ai"] = True;
+        } elif arg == "--no-seo" {
+            opts["seo"] = False;
+        } elif arg in ["--store", "-s"] {
+            opts["store"] = True;
+        } elif arg in ["--json", "-j"] {
+            opts["format"] = "json";
+        } elif arg == "--csv" {
+            opts["format"] = "csv";
+        } elif arg == "--markdown" or arg == "--md" {
+            opts["format"] = "markdown";
+        } elif arg in ["--output", "-o"] and i + 1 < len(args) {
+            i += 1;
+            opts["output"] = args[i];
+        } elif arg == "--max" and i + 1 < len(args) {
+            i += 1;
+            opts["max_products"] = int(args[i]);
+        } elif arg == "--min-score" and i + 1 < len(args) {
+            i += 1;
+            opts["min_score"] = int(args[i]);
+        } elif arg == "--returns" and i + 1 < len(args) {
+            i += 1;
+            opts["returns_file"] = args[i];
+        } elif not arg.startswith("-") and not opts["url"] {
+            opts["url"] = arg;
+        }
+        i += 1;
+    }
+    return opts;
+}
+
+def print_help() -> None {
+    """Print CLI usage help."""
     print("amplify-audit: Data-Spatial Product Quality Analysis");
     print("====================================================");
     print("");
-    print("Build a product graph and spawn walkers to analyze.");
+    print("Usage:");
+    print("  jac run main.jac <url>           Audit a single product");
+    print("  jac run main.jac <url> --store   Audit an entire store");
+    print("  jac start api.jac                Start REST API server");
     print("");
+    print("Options:");
+    print("  <url>                Product or store URL to audit");
+    print("  --store, -s          Treat URL as a store (fetch all products)");
+    print("  --ai, -a             Enable AI-powered analysis (requires ANTHROPIC_API_KEY)");
+    print("  --no-seo             Skip SEO analysis");
+    print("  --json, -j           Output as JSON");
+    print("  --csv                Output as CSV");
+    print("  --markdown, --md     Output as Markdown");
+    print("  --output, -o <file>  Write output to file");
+    print("  --max <n>            Max products to fetch from store (default: 50)");
+    print("  --min-score <n>      Only show products below this score (default: 0)");
+    print("  --returns <file>     JSON file with return data");
+    print("  --help, -h           Show this help");
+    print("");
+    print("Examples:");
+    print("  jac run main.jac https://allbirds.com/products/mens-tree-runners");
+    print("  jac run main.jac https://allbirds.com --store --json -o report.json");
+    print("  jac run main.jac https://amazon.com/dp/B08N5WRWNW --ai");
+    print("");
+    print("API Server:");
+    print("  jac start api.jac --port 8002");
+    print("  curl -X POST http://localhost:8002/walker/audit_product \\");
+    print('    -H "Content-Type: application/json" \\');
+    print('    -d \'{"url": "https://allbirds.com/products/mens-tree-runners"}\'');
+}
 
-    # Example: audit a single product
-    sample = {
-        "url": "https://example.com/products/blue-sweater",
-        "platform": "shopify",
-        "title": "Blue Sweater",
-        "description": "<p>A cozy blue sweater.</p>",
-        "tags": ["clothing"],
-        "vendor": "TestBrand",
-        "price": "49.99",
-        "images": ["img1.jpg"],
-        "variants": [{"title": "Small", "sku": "BS-S", "price": "49.99"}]
-    };
+def print_report(report: dict, min_score: int = 0) -> None {
+    """Pretty-print a single product audit report."""
+    title = report.get("title", "Unknown");
+    score = report.get("quality_score", -1);
+    url = report.get("url", "");
 
-    sample_returns = {
-        "reasons": ["runs small", "too tight", "size up", "too small for me"],
-        "order_count": 100,
-        "return_count": 25,
-        "ticket_count": 5
-    };
+    if min_score > 0 and score >= min_score {
+        return;
+    }
 
-    result = audit_single(sample, sample_returns);
-    print(f"Audit complete. Results: {result}");
+    # Score indicator
+    if score >= 80 { indicator = "[GOOD]"; }
+    elif score >= 60 { indicator = "[OK]"; }
+    elif score >= 40 { indicator = "[WARN]"; }
+    elif score >= 0 { indicator = "[POOR]"; }
+    else { indicator = "[N/A]"; }
+
+    print(f"\n{indicator} {title}");
+    print(f"  URL: {url}");
+    print(f"  Quality Score: {score}/100");
+
+    # Issues
+    issues = report.get("issues", []);
+    if issues {
+        errors = [i for i in issues if i.get("severity") == "error"];
+        warnings = [i for i in issues if i.get("severity") == "warning"];
+        print(f"  Issues: {len(errors)} errors, {len(warnings)} warnings");
+        for i in errors[:3] {
+            print(f"    [ERROR] {i.get('message', '')}");
+        }
+        for i in warnings[:3] {
+            print(f"    [WARN]  {i.get('message', '')}");
+        }
+    }
+
+    # Return risk
+    risk = report.get("return_risk", None);
+    if isinstance(risk, dict) and risk.get("score") {
+        print(f"  Return Risk: {risk['score']}");
+        if risk.get("primary_issue_type") {
+            print(f"  Primary Issue: {risk['primary_issue_type']}");
+        }
+        if risk.get("fixable_by_pdp") {
+            print(f"  Fixable by PDP: Yes");
+        }
+    }
+
+    # Recommendations
+    recs = report.get("recommendations", []);
+    if recs {
+        print(f"  Recommendations: {len(recs)}");
+        for r in recs[:2] {
+            print(f"    - {r.get('field', '')}: {r.get('rationale', '')}");
+        }
+    }
+}
+
+# ─── Entry Point ─────────────────────────────────────────────────────────────
+
+with entry {
+    opts = parse_args();
+
+    if opts["help"] or not opts["url"] {
+        print_help();
+    } else {
+        url = opts["url"];
+        print(f"amplify-audit: Analyzing {url}...");
+        print("");
+
+        # Load return data if provided
+        return_data: dict | None = None;
+        if opts["returns_file"] {
+            try {
+                with open(opts["returns_file"], "r") as f {
+                    return_data = json.load(f);
+                }
+            } except Exception as e {
+                print(f"Warning: Could not load returns file: {e}");
+            }
+        }
+
+        if opts["store"] {
+            # Store-wide audit
+            print(f"Fetching products from store (max {opts['max_products']})...");
+            products = fetch_store(url, opts["max_products"]);
+            print(f"Fetched {len(products)} products. Building graph...");
+
+            result = audit_catalog(products, return_data, opts["ai"], min(20, opts["max_products"]));
+
+            # SEO analysis
+            if opts["seo"] {
+                root spawn SEOAnalyzer();
+            }
+
+            # Trend analysis
+            trend_walker = root spawn TrendAnalyzer();
+            trends = analyze_trends(trend_walker) if trend_walker else {};
+            result["trends"] = trends;
+
+            # Output
+            reports = result.get("products", []);
+            if opts["format"] == "json" {
+                output = export_json(result);
+                if opts["output"] {
+                    export_to_file([result], opts["output"], "json");
+                    print(f"Report saved to {opts['output']}");
+                } else {
+                    print(output);
+                }
+            } elif opts["format"] == "csv" {
+                output = export_csv(reports);
+                if opts["output"] {
+                    with open(opts["output"], "w") as f {
+                        f.write(output);
+                    }
+                    print(f"CSV saved to {opts['output']}");
+                } else {
+                    print(output);
+                }
+            } elif opts["format"] == "markdown" {
+                output = export_markdown(reports, title=f"Audit Report: {url}");
+                if opts["output"] {
+                    with open(opts["output"], "w") as f {
+                        f.write(output);
+                    }
+                    print(f"Markdown report saved to {opts['output']}");
+                } else {
+                    print(output);
+                }
+            } else {
+                # Pretty text output
+                summary = result.get("summary", {});
+                print(f"Products: {summary.get('total', 0)}");
+                print(f"Average Quality: {summary.get('avg_quality', 0)}/100");
+                print(f"Critical: {summary.get('critical_count', 0)}");
+                print(f"Fixable: {summary.get('fixable_count', 0)}");
+
+                for r in reports {
+                    if isinstance(r, dict) {
+                        print_report(r, opts["min_score"]);
+                    }
+                }
+
+                # Trends summary
+                if trends and trends.get("summary") {
+                    print(f"\n--- Trends ---");
+                    print(trends["summary"]);
+                }
+            }
+        } else {
+            # Single product audit
+            print("Fetching product data...");
+            product_data = fetch_product(url);
+
+            if not product_data.get("title", "") {
+                print(f"Error: Could not fetch product data from {url}");
+            } else {
+                print(f"Product: {product_data.get('title', '')}");
+                print(f"Platform: {product_data.get('platform', 'unknown')}");
+                print("");
+
+                result = audit_single(product_data, return_data, opts["ai"]);
+
+                # SEO analysis
+                if opts["seo"] {
+                    root spawn SEOAnalyzer();
+                }
+
+                # Re-collect report with SEO data
+                reporter = root spawn AuditReporter();
+                reports = reporter if reporter else [];
+
+                if opts["format"] == "json" {
+                    output = export_json(reports);
+                    if opts["output"] {
+                        export_to_file(reports, opts["output"], "json");
+                        print(f"Report saved to {opts['output']}");
+                    } else {
+                        print(output);
+                    }
+                } elif opts["format"] == "csv" {
+                    output = export_csv(reports);
+                    if opts["output"] {
+                        with open(opts["output"], "w") as f {
+                            f.write(output);
+                        }
+                        print(f"CSV saved to {opts['output']}");
+                    } else {
+                        print(output);
+                    }
+                } elif opts["format"] == "markdown" {
+                    output = export_markdown(reports);
+                    if opts["output"] {
+                        with open(opts["output"], "w") as f {
+                            f.write(output);
+                        }
+                        print(f"Markdown report saved to {opts['output']}");
+                    } else {
+                        print(output);
+                    }
+                } else {
+                    for r in reports {
+                        if isinstance(r, dict) {
+                            print_report(r, opts["min_score"]);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

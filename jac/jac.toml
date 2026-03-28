@@ -1,10 +1,16 @@
 [project]
 name = "amplify-audit"
-version = "0.2.0"
+version = "0.3.0"
+description = "Data-Spatial Product Quality Analysis — the first open-source product listing linter"
 entry = "main.jac"
 
 [server]
 port = 8002
+
+[plugins.scale.cors]
+allow_origins = ["*"]
+allow_methods = ["GET", "POST"]
+allow_headers = ["*"]
 
 [plugins.byllm.model]
 default_model = "claude-sonnet-4-6"
