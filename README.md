@@ -16,26 +16,26 @@
     <a href="#what-it-catches">What It Catches</a> &middot;
     <a href="#the-scoring-model">Scoring</a> &middot;
     <a href="#jac-version-graph-aware-analysis">Graph-Aware Analysis</a> &middot;
-    <a href="#api">API</a>
+    <a href="#rest-api">API</a>
   </p>
 </p>
 
 ---
 
-> U.S. e-commerce returns hit **$800B+ in 2024**. The #1 driver? Bad product listings — missing sizing info, vague descriptions, misleading photos. Most of these are fixable with better copy. amplify-audit finds the issues and tells you exactly what to change.
+> U.S. e-commerce returns hit **$800B+ in 2024**. The #1 driver? Bad product listings. Missing sizing info, vague descriptions, misleading photos. Most of these are fixable with better copy. amplify-audit finds the problems and tells you exactly what to change.
 
 ---
 
 ## Highlights
 
 - **15+ quality checks** across title, description, images, sizing, SEO, price, and trust signals
-- **98-keyword return classifier** across 5 issue categories with optional LLM semantic fallback
-- **Entropy-based fixability scoring** — novel metric using Shannon entropy to measure if a product's returns have a fixable root cause
-- **4 platforms** — Shopify, Amazon, Best Buy, and any site with JSON-LD / OpenGraph
-- **Graph-aware analysis** — Jac version detects brand-wide patterns invisible to flat tools
-- **Actionable fixes** — generates before/after PDP diffs you can apply directly
-- **Two interfaces** — npm package (TypeScript) and Jac version (graph-based, with CLI + REST API)
-- **Zero config** — works out of the box, no API keys for core analysis
+- **98-keyword return classifier** covering 5 issue categories, with optional LLM semantic fallback
+- **Entropy-based fixability scoring**, a novel metric that uses Shannon entropy to measure whether a product's returns have a single fixable root cause
+- **4 platforms** supported: Shopify, Amazon, Best Buy, and any site with JSON-LD / OpenGraph
+- **Graph-aware analysis** in the Jac version, detecting brand-wide patterns that flat tools can't see
+- **Actionable fixes** with before/after PDP diffs you can apply directly
+- **Two interfaces**: an npm package (TypeScript) and a Jac version (graph-based, CLI + REST API)
+- **Zero config**. Works out of the box. No API keys needed for core analysis
 
 ## Quick Start
 
@@ -52,7 +52,7 @@ pip install jaclang jac-byllm requests
 jac run jac/main.jac https://allbirds.com/products/mens-tree-runners
 ```
 
-No API keys needed. AI features are opt-in (`--ai` flag with `ANTHROPIC_API_KEY`).
+No API keys needed. AI features are opt-in (pass `--ai` with `ANTHROPIC_API_KEY` set).
 
 ## What It Catches
 
@@ -64,7 +64,7 @@ $ npx amplify-audit https://example-store.com/products/womens-running-shoes
 
   Quality Score: 42/100  NEEDS WORK
 
-  ─── Issues Found ───
+  Issues Found
   ✗ description    Description is too short (87 chars). Target 300-1000.
   ✗ images         Only 2 image(s). Aim for 4+ with lifestyle and detail shots.
   ▲ sizing         No sizing or fit info found. #1 driver of returns.
@@ -73,14 +73,14 @@ $ npx amplify-audit https://example-store.com/products/womens-running-shoes
   ○ material       No material/fabric information detected.
   ○ care           No care instructions found.
 
-  ─── Return Risk Analysis ───
+  Return Risk Analysis
   Risk Level: MEDIUM
   Primary Issue: SIZING (82% of returns)
-  Reason Concentration: 0.74 (high — clear fixable signal)
+  Reason Concentration: 0.74 (high, clear fixable signal)
   Fixable by PDP: Yes
 
-  ─── Recommended Fixes ───
-  1. title → "Women's Running Shoes (Runs Small — Consider Sizing Up)"
+  Recommended Fixes
+  1. title → "Women's Running Shoes (Runs Small, Consider Sizing Up)"
      Set expectations at top of listing to reduce fit-related returns.
 
   2. description → Add: "Fit note: This style runs slightly small.
@@ -88,7 +88,7 @@ $ npx amplify-audit https://example-store.com/products/womens-running-shoes
      Adds concrete fit guidance shoppers can act on before purchasing.
 ```
 
-The key insight: this product has a **0.74 reason concentration** — returns are heavily clustered around one fixable cause. A single description change could meaningfully reduce the return rate.
+The important thing here: this product has a **0.74 reason concentration**. Returns are heavily clustered around one fixable cause. A single description change could meaningfully reduce the return rate.
 
 ## The Scoring Model
 
@@ -98,7 +98,7 @@ The key insight: this product has a **0.74 reason concentration** — returns ar
 Q(p) = max(0, min(100,  100 - 20·errors - 10·warnings - 3·infos))
 ```
 
-15+ heuristic checks across title (length, caps, separators), description (length, sizing keywords, material, care instructions), images (count), tags, price, and vendor.
+15+ heuristic checks covering title (length, caps, separators), description (length, sizing keywords, material, care instructions), images (count), tags, price, and vendor.
 
 ### SKU Health Score (Fixability)
 
@@ -115,7 +115,7 @@ S(p) = 0.40·R̂(p) + 0.20·T̂(p) + 0.25·K̂(p) + 0.15·Ĉ(p)
 
 ### The Entropy Metric
 
-This is what makes amplify-audit different. The reason concentration `C(p)` measures whether a product's returns point to a single fixable cause:
+This is the thing that makes amplify-audit different from everything else out there. The reason concentration `C(p)` tells you whether a product's returns point to one fixable cause or are just noise:
 
 ```
 H(X)     = -Σ pᵢ · log₂(pᵢ)       ← Shannon entropy of return reasons
@@ -125,15 +125,15 @@ C(p)     = 1 - H_norm               ← 0 = uniform noise, 1 = single cause
 
 | Scenario | C(p) | What It Means |
 |----------|------|---------------|
-| 90% of returns say "runs small" | **0.93** | One clear, fixable cause — add a sizing note |
-| 60/20/10/10 split across 4 reasons | **0.32** | One dominant cause, some noise |
-| 20% each across 5 reason types | **0.00** | No dominant cause — PDP fix won't help |
+| 90% of returns say "runs small" | **0.93** | One clear, fixable cause. Add a sizing note. |
+| 60/20/10/10 split across 4 reasons | **0.32** | One dominant cause with some noise |
+| 20% each across 5 reason types | **0.00** | No dominant cause. A PDP fix won't help. |
 
-A product with 30% return rate and C(p) = 0.93 is a slam dunk for a PDP fix. A product with 30% return rate and C(p) = 0.05 has systemic issues no description change will solve.
+If a product has a 30% return rate and C(p) = 0.93, that's a slam dunk for a PDP fix. If it has a 30% return rate and C(p) = 0.05, the problems are systemic and no description change will solve them. That distinction is the whole point.
 
 ## With Return Data
 
-Have return reasons? Feed them in for the full analysis:
+If you have return reasons, feed them in for the full analysis:
 
 ```bash
 npx amplify-audit https://allbirds.com/products/mens-tree-runners \
@@ -188,14 +188,14 @@ const primary = getPrimaryIssueType(scores) // 'sizing'
 import { computeFixabilityScore, computeReasonConcentration } from 'amplify-audit'
 
 const concentration = computeReasonConcentration({ 'runs small': 8, 'other': 2 })
-// 0.72 — high concentration = clear signal
+// 0.72 = high concentration = clear signal
 ```
 
 </details>
 
 ## CI/CD Quality Gate
 
-Fail your pipeline when listing quality drops below a threshold:
+You can fail your pipeline when listing quality drops below a threshold:
 
 ```bash
 npx amplify-audit https://your-store.com/products/sku-123 --min-score 70 --json
@@ -213,13 +213,13 @@ Exits with code 1 if the score is below `--min-score`.
 
 ## Jac Version: Graph-Aware Analysis
 
-The `jac/` directory contains a full rewrite using [Object-Spatial Programming](https://www.jac-lang.org/) — a paradigm where **data lives on a graph and computation moves through it**.
+The `jac/` directory contains a full rewrite in [Jac](https://www.jac-lang.org/), a language built around Object-Spatial Programming. The idea is simple: data lives on a graph, and computation moves through it.
 
-This unlocks analysis that flat tools literally cannot do.
+This makes it possible to do analysis that flat tools literally cannot do.
 
 ### Why Graphs?
 
-Product catalogs ARE graphs: products belong to brands, brands span categories, returns cite reasons that cluster into fixable issues. amplify-audit models your catalog as a **typed property graph**:
+Product catalogs are graphs. Products belong to brands, brands span categories, returns cite reasons that cluster into fixable issues. amplify-audit models your catalog as a **typed property graph**:
 
 ```
 root
@@ -233,17 +233,17 @@ root
       └──[BelongsToBrand]── Product("Tree Runners")
 ```
 
-Then sends **8 specialized walkers** (analysis agents) through the graph:
+Then it sends **8 specialized walkers** (analysis agents) through the graph:
 
 | Walker | What It Does |
 |--------|-------------|
 | `QualityAnalyzer` | 15+ rule-based checks on title, description, images, tags, price |
 | `ReturnAnalyzer` | Classifies return reasons, computes entropy-based SKU health |
 | `RecommendationWalker` | Generates before/after PDP fix diffs |
-| `SEOAnalyzer` | SEO scoring: title keywords, description density, URL slug |
+| `SEOAnalyzer` | SEO scoring for title keywords, description density, URL slug |
 | `AiEnricher` | Optional LLM-powered deep analysis via `by llm()` |
 | `BrandAggregator` | Cross-product brand-level metrics |
-| `TrendAnalyzer` | Catalog-wide pattern detection: co-occurrence, hotspots |
+| `TrendAnalyzer` | Catalog-wide pattern detection, co-occurrence, hotspots |
 | `AuditReporter` | Collects everything into a structured report |
 
 ### What the graph enables
@@ -252,9 +252,9 @@ Then sends **8 specialized walkers** (analysis agents) through the graph:
 
 **Issue co-occurrence:** "Products with sizing issues also tend to have image issues (found together on 12 products)."
 
-**Fixability hotspots:** "Sizing issues are the highest-impact fix across your catalog — 34 products fixable by PDP changes."
+**Fixability hotspots:** "Sizing is the highest-impact fix across your catalog. 34 products fixable by PDP changes."
 
-Flat tools analyze each product in isolation. They can't see any of this.
+Flat tools analyze each product in isolation and can't see any of this.
 
 ### Jac Quick Start
 
@@ -290,7 +290,7 @@ def analyze_product_listing(
 sem AiInsight.quality_score = "Quality score 0-100. Most decent listings score 55-80";
 ```
 
-The compiler generates the prompt from the function signature + `sem` annotations. Type-safe output. Testable with mock backends. No brittle prompts.
+The compiler generates the prompt from the function signature and `sem` annotations. Type-safe output. Testable with mock backends. No brittle prompt strings.
 
 ### REST API
 
@@ -343,14 +343,14 @@ Swagger docs at `http://localhost:8002/docs`.
 | `types.jac` | 195 | Graph schema: 6 node types, 6 edge types, 8 objects, 6 enums |
 | `scoring.jac` | 153 | Shannon entropy, composite scoring, confidence |
 | `classifier.jac` | 201 | 98-keyword classifier + `by llm()` semantic fallback |
-| `analyzer.jac` | 173 | Rule-based quality analysis: 15+ heuristic checks |
-| `ai_analyzer.jac` | 127 | Meaning-Typed LLM analysis: 4 `by llm()` functions |
+| `analyzer.jac` | 173 | Rule-based quality analysis, 15+ heuristic checks |
+| `ai_analyzer.jac` | 127 | Meaning-Typed LLM analysis, 4 `by llm()` functions |
 | `recommender.jac` | 147 | Deterministic PDP fix templates by issue type |
-| `seo_analyzer.jac` | 250 | SEO scoring: title, description, URL, images, tags |
+| `seo_analyzer.jac` | 250 | SEO scoring for title, description, URL, images, tags |
 | `fetcher.jac` | 270 | Multi-platform product fetching |
 | `walkers.jac` | 491 | 6 core analysis walkers |
 | `trend_analyzer.jac` | 266 | Cross-product pattern detection |
-| `export.jac` | 220 | Report export: JSON, CSV, Markdown |
+| `export.jac` | 220 | Report export in JSON, CSV, Markdown |
 | `api.jac` | 190 | REST API via walker-as-API |
 | `main.jac` | 450 | CLI entry point |
 | `tests.jac` | 195 | 18+ test cases |
@@ -364,15 +364,15 @@ Swagger docs at `http://localhost:8002/docs`.
 | Platform | Single Product | Store Catalog | Method |
 |----------|:-:|:-:|--------|
 | Shopify | ✓ | ✓ | `.json` API |
-| Amazon | ✓ | — | HTML scraping + JSON-LD |
-| Best Buy | ✓ | — | JSON-LD + fallback |
-| Generic | ✓ | — | JSON-LD + OpenGraph |
+| Amazon | ✓ | - | HTML scraping + JSON-LD |
+| Best Buy | ✓ | - | JSON-LD + fallback |
+| Generic | ✓ | - | JSON-LD + OpenGraph |
 
-## What It Does NOT Do
+## What This Doesn't Do
 
-- **Predict returns from behavioral data** (customer history, purchase patterns). It identifies fixable listing content.
-- **Manage product data** (that's what PIMs like Salsify and Akeneo do). It audits and scores it.
-- **Auto-apply fixes.** It generates before/after diffs for human review. (The full [Amplify](https://use-amplify.com) platform adds automated Shopify writes.)
+- **Predict returns from behavioral data** (customer history, purchase patterns). It looks at listing content, not buyer behavior.
+- **Manage product data.** That's what PIMs like Salsify and Akeneo do. This audits and scores listings.
+- **Auto-apply fixes.** It generates before/after diffs for human review. The full [Amplify](https://use-amplify.com) platform handles automated Shopify writes.
 
 ## Configuration
 
@@ -420,19 +420,19 @@ jac test jac/tests.jac
 
 ## Contributing
 
-PRs welcome. The Jac walker architecture makes it easy to add new analysis:
+PRs welcome. The Jac walker architecture makes it straightforward to add new analysis:
 
 1. Define new node/edge types in `jac/types.jac`
 2. Create a new walker in its own `.jac` file
 3. Add the walker to the pipeline in `jac/main.jac`
 
-No need to modify existing walkers.
+No need to modify existing walkers or analysis code.
 
-For the TypeScript version: add modules in `src/`, include test cases.
+For the TypeScript version, add modules in `src/` and include test cases.
 
 ## About
 
-Built by [Amplify](https://use-amplify.com) — AI operations for e-commerce teams. amplify-audit is the free, open-source analysis engine. The full platform adds continuous monitoring, auto-apply to Shopify, multi-agent AI, and impact measurement.
+Built by [Amplify](https://use-amplify.com). amplify-audit is the free, open-source analysis engine. The full platform adds continuous monitoring, auto-apply to Shopify, multi-agent AI, and impact measurement.
 
 ## License
 
