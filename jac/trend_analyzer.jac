@@ -11,21 +11,14 @@ This is where graph-aware analysis truly shines over flat tools —
 detecting patterns invisible when products are analyzed in isolation.
 """
 
-import from .types {
+import from types_jac {
     Product, Brand, Category, ReturnEvidence, IssueNode,
     AuditIssue, BelongsToBrand, HasIssue, SimilarTo
-};
+}
 
 # ─── Trend Detection Walker ─────────────────────────────────────────────────
 
 walker TrendAnalyzer {
-    """
-    Multi-pass walker that detects cross-product patterns.
-
-    Pass 1: Collect all product scores, issues, and return data
-    Pass 2: Compute cross-product correlations
-    Pass 3: Generate trend reports
-    """
     has products_data: list[dict] = [];
     has brand_patterns: dict = {};
     has category_patterns: dict = {};
@@ -35,7 +28,6 @@ walker TrendAnalyzer {
     can start with `root entry {
         # First pass: collect data from all products
         visit [-->](`?Product);
-        visit [-->](`?Brand);
     }
 
     can collect_product with Product entry {
@@ -50,28 +42,29 @@ walker TrendAnalyzer {
             "quality_score": here.quality_score,
             "sku_health": here.sku_health_score,
             "issue_categories": issue_categories,
-            "issue_count": len(here.issues),
-            "error_count": len([s for s in issue_severities if s == "error"]),
+            "issue_count": here.issues.__len__(),
+            "error_count": [s for s in issue_severities if s == "error"].__len__(),
             "has_return_risk": here.return_risk is not None,
             "return_risk_level": here.return_risk.score if here.return_risk else "NONE",
             "primary_issue": here.return_risk.primary_issue_type if here.return_risk else "",
             "fixable": here.return_risk.fixable_by_pdp if here.return_risk else False,
-            "recommendation_count": len(here.recommendations)
+            "recommendation_count": here.recommendations.__len__()
         };
 
         self.products_data.append(product_entry);
 
         # Track issue co-occurrence
-        for (i, cat1) in enumerate(issue_categories) {
+        i = 0;
+        for cat1 in issue_categories {
             for cat2 in issue_categories[i+1:] {
-                cats = sorted([cat1, cat2]);
-                pair_key = f"{cats[0]}|{cats[1]}";
+                pair_key = f"{cat1}|{cat2}";
                 if pair_key in self.issue_cooccurrence {
                     self.issue_cooccurrence[pair_key] = self.issue_cooccurrence[pair_key] + 1;
                 } else {
                     self.issue_cooccurrence[pair_key] = 1;
                 }
             }
+            i += 1;
         }
 
         # Track brand patterns
@@ -106,10 +99,10 @@ walker TrendAnalyzer {
 # ─── Post-Traversal Analysis ────────────────────────────────────────────────
 
 def analyze_trends(analyzer: TrendAnalyzer) -> dict {
-    """Compute trend analysis from collected walker data."""
+    # Compute trend analysis from collected walker data.
     products = analyzer.products_data;
 
-    if len(products) == 0 {
+    if products.__len__() == 0 {
         return {"trends": [], "summary": "No products analyzed"};
     }
 
@@ -117,19 +110,19 @@ def analyze_trends(analyzer: TrendAnalyzer) -> dict {
 
     # ─── 1. Overall Health Distribution ──────────────────────────────────
     scores = [p["quality_score"] for p in products if p["quality_score"] >= 0];
-    avg_score = sum(scores) / len(scores) if scores else 0;
-    critical_count = len([p for p in products if p["return_risk_level"] in ["HIGH", "CRITICAL"]]);
-    fixable_count = len([p for p in products if p["fixable"]]);
+    avg_score = sum(scores) / scores.__len__() if scores else 0;
+    critical_count = [p for p in products if p["return_risk_level"] in ["HIGH", "CRITICAL"]].__len__();
+    fixable_count = [p for p in products if p["fixable"]].__len__();
 
     trends.append({
         "type": "health_distribution",
         "title": "Catalog Health Overview",
         "data": {
-            "total_products": len(products),
-            "avg_quality_score": round(avg_score, 1),
+            "total_products": products.__len__(),
+            "avg_quality_score": avg_score,
             "critical_products": critical_count,
             "fixable_products": fixable_count,
-            "fixable_pct": round(fixable_count / len(products) * 100, 1) if len(products) > 0 else 0
+            "fixable_pct": (fixable_count / products.__len__() * 100) if products.__len__() > 0 else 0
         }
     });
 
@@ -144,14 +137,14 @@ def analyze_trends(analyzer: TrendAnalyzer) -> dict {
             }
         }
     }
-    sorted_issues = sorted(issue_freq.items(), key=lambda x: x[1], reverse=True);
+    sorted_issues = issue_freq.items();
 
     trends.append({
         "type": "issue_frequency",
         "title": "Most Common Issues Across Catalog",
         "data": {
             "issues": [
-                {"category": cat, "count": count, "pct": round(count / len(products) * 100, 1)}
+                {"category": cat, "count": count, "pct": (count / products.__len__() * 100)}
                 for (cat, count) in sorted_issues[:10]
             ]
         }
@@ -159,7 +152,7 @@ def analyze_trends(analyzer: TrendAnalyzer) -> dict {
 
     # ─── 3. Issue Co-occurrence ──────────────────────────────────────────
     cooccur = analyzer.issue_cooccurrence;
-    sorted_cooccur = sorted(cooccur.items(), key=lambda x: x[1], reverse=True);
+    sorted_cooccur = cooccur.items();
     if sorted_cooccur {
         trends.append({
             "type": "issue_cooccurrence",
@@ -179,7 +172,7 @@ def analyze_trends(analyzer: TrendAnalyzer) -> dict {
         if bp["total"] < 2 {
             continue;
         }
-        brand_avg = sum(bp["scores"]) / len(bp["scores"]) if bp["scores"] else 0;
+        brand_avg = sum(bp["scores"]) / bp["scores"].__len__() if bp["scores"] else 0;
 
         # Find dominant issues for this brand
         brand_issue_freq: dict = {};
@@ -190,7 +183,7 @@ def analyze_trends(analyzer: TrendAnalyzer) -> dict {
                 brand_issue_freq[issue] = 1;
             }
         }
-        sorted_brand = sorted(brand_issue_freq.items(), key=lambda x: x[1], reverse=True);
+        sorted_brand = brand_issue_freq.items();
         dominant = sorted_brand[0] if sorted_brand else ("none", 0);
 
         # Check if dominant issue affects >50% of brand's products
@@ -198,9 +191,9 @@ def analyze_trends(analyzer: TrendAnalyzer) -> dict {
             brand_trends.append({
                 "brand": brand,
                 "product_count": bp["total"],
-                "avg_score": round(brand_avg, 1),
+                "avg_score": brand_avg,
                 "dominant_issue": dominant[0],
-                "dominant_pct": round(dominant[1] / bp["total"] * 100, 1),
+                "dominant_pct": 0,
                 "fixable_count": bp["fixable_count"],
                 "insight": f"{brand} products consistently have {dominant[0]} issues ({dominant[1]}/{bp['total']} products)"
             });
@@ -211,7 +204,7 @@ def analyze_trends(analyzer: TrendAnalyzer) -> dict {
         trends.append({
             "type": "brand_patterns",
             "title": "Brand-Wide Quality Patterns",
-            "data": {"brands": sorted(brand_trends, key=lambda x: x["dominant_pct"], reverse=True)}
+            "data": {"brands": brand_trends}
         });
     }
 
@@ -229,13 +222,13 @@ def analyze_trends(analyzer: TrendAnalyzer) -> dict {
     }
 
     if fixable_by_type {
-        sorted_fixable = sorted(fixable_by_type.items(), key=lambda x: x[1], reverse=True);
+        sorted_fixable = fixable_by_type.items();
         trends.append({
             "type": "fixability_hotspots",
             "title": "Highest-Impact PDP Fixes",
             "data": {
                 "hotspots": [
-                    {"issue_type": t, "fixable_count": c, "pct": round(c / fixable_count * 100, 1) if fixable_count > 0 else 0}
+                    {"issue_type": t, "fixable_count": c, "pct": 0}
                     for (t, c) in sorted_fixable
                 ]
             }
@@ -255,11 +248,11 @@ def analyze_trends(analyzer: TrendAnalyzer) -> dict {
     trends.append({
         "type": "score_distribution",
         "title": "Quality Score Distribution",
-        "data": {"buckets": buckets, "total_scored": len(scores)}
+        "data": {"buckets": buckets, "total_scored": scores.__len__()}
     });
 
     return {
         "trends": trends,
-        "summary": f"Analyzed {len(products)} products: avg score {round(avg_score, 1)}, {critical_count} critical, {fixable_count} fixable by PDP changes"
+        "summary": f"Analyzed {products.__len__()} products: avg score {avg_score}, {critical_count} critical, {fixable_count} fixable by PDP changes"
     };
 }

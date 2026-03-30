@@ -34,13 +34,13 @@
 
 ```bash
 # Install
-pip install jaclang jac-byllm requests
+pip install -r requirements.txt
 
 # Audit a single product
-jac run main.jac https://allbirds.com/products/mens-tree-runners
+AMPLIFY_AUDIT_URL=https://allbirds.com/products/mens-tree-runners jac run main.jac
 
 # Audit an entire Shopify store
-jac run main.jac https://allbirds.com --store --max 50
+AMPLIFY_AUDIT_URL=https://allbirds.com jac run main.jac --store --max 50
 ```
 
 That's it. No API keys needed for the core analysis.
@@ -50,21 +50,23 @@ That's it. No API keys needed for the core analysis.
 
 ```bash
 # Export as JSON
-jac run main.jac https://allbirds.com --store --json -o report.json
+AMPLIFY_AUDIT_URL=https://allbirds.com jac run main.jac --store --json -o report.json
 
 # Export as CSV (open in Excel/Sheets)
-jac run main.jac https://allbirds.com --store --csv -o report.csv
+AMPLIFY_AUDIT_URL=https://allbirds.com jac run main.jac --store --csv -o report.csv
 
 # Export as Markdown report
-jac run main.jac https://allbirds.com --store --markdown -o report.md
+AMPLIFY_AUDIT_URL=https://allbirds.com jac run main.jac --store --markdown -o report.md
 
 # Enable AI deep analysis (requires API key)
 export ANTHROPIC_API_KEY=sk-ant-...
-jac run main.jac https://allbirds.com/products/mens-tree-runners --ai
+AMPLIFY_AUDIT_URL=https://allbirds.com/products/mens-tree-runners jac run main.jac --ai
 
 # Filter by score threshold
-jac run main.jac https://allbirds.com --store --min-score 50
+AMPLIFY_AUDIT_URL=https://allbirds.com jac run main.jac --store --min-score 50
 ```
+
+AI enrichment is optional. If the `jac-byllm` plugin is not available in your environment, run without `--ai` and core analysis still works.
 
 </details>
 

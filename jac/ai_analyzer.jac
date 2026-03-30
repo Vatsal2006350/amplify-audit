@@ -14,7 +14,7 @@ The LLM receives:
 And produces type-validated structured output automatically.
 """
 
-import from .types { AuditIssue, AiInsight }
+import from types_jac { AuditIssue, AiInsight }
 
 # ─── Meaning-Typed Analysis Functions ────────────────────────────────────────
 

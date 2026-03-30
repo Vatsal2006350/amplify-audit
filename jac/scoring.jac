@@ -25,7 +25,6 @@ glob WEIGHT_REASON_CONCENTRATION: int = 15;
 # ─── Core Scoring Functions ──────────────────────────────────────────────────
 
 def compute_return_rate(return_count: int, order_count: int) -> float {
-    """Compute return rate as a ratio."""
     if order_count == 0 {
         return 0.0;
     }
@@ -33,7 +32,6 @@ def compute_return_rate(return_count: int, order_count: int) -> float {
 }
 
 def compute_ticket_rate(ticket_count: int, order_count: int) -> float {
-    """Compute support ticket rate as a ratio."""
     if order_count == 0 {
         return 0.0;
     }
@@ -41,36 +39,28 @@ def compute_ticket_rate(ticket_count: int, order_count: int) -> float {
 }
 
 def compute_reason_concentration(breakdown: dict) -> float {
-    """
-    Shannon entropy of reason distribution, inverted.
-
-    Lower entropy = more concentrated reasons = clearer signal.
-    Returns 0.0 (uniform distribution) to 1.0 (single reason).
-
-    Formally:
-      H(X) = -sum(p_i * log2(p_i)) for each unique reason i
-      H_norm = H(X) / log2(|reasons|)
-      C(p) = 1 - H_norm
-    """
+    # Shannon entropy of reason distribution, inverted.
     values = list(breakdown.values());
-    total = sum(values);
+    total = 0;
+    for v in values {
+        total += v;
+    }
     if total == 0 {
         return 0.0;
     }
 
-    n = len(values);
+    n = values.__len__();
     if n <= 1 {
         return 1.0;
     }
-
-    probs = [v / total for v in values];
     max_entropy = log2(n);
     if max_entropy == 0 {
         return 1.0;
     }
 
     entropy = 0.0;
-    for p in probs {
+    for v in values {
+        p = v / total;
         if p > 0 {
             entropy -= p * log2(p);
         }
@@ -86,16 +76,7 @@ def compute_fixability_score(
     keyword_signal_count: int,
     reason_breakdown: dict
 ) -> float {
-    """
-    Composite fixability score S(p) in [0, 100].
-
-    Higher = more likely a PDP fix will reduce returns.
-
-    S(p) = (w_r * min(R*100, 100) + w_t * min(T*100, 100)
-          + w_k * min(K*10, 100) + w_c * C*100) / 100
-
-    Where w_r=40, w_t=20, w_k=25, w_c=15.
-    """
+    # Composite fixability score S(p) in [0, 100].
     return_rate_score = min(return_rate * 100, 100.0);
     ticket_rate_score = min(ticket_rate * 100, 100.0);
     keyword_score = min(keyword_signal_count * 10, 100);
@@ -108,20 +89,11 @@ def compute_fixability_score(
         + concentration_score * WEIGHT_REASON_CONCENTRATION
     ) / 100.0;
 
-    return round(composite * 100) / 100;
+    return composite;
 }
 
 def compute_confidence(order_count: int, return_count: int) -> float {
-    """
-    Statistical confidence based on sample size.
-
-    Uses a step function with linear interpolation:
-      orders < 10  -> 0.2
-      orders < 30  -> 0.4
-      orders < 50  -> 0.6
-      returns < 5  -> 0.5
-      otherwise    -> 0.7 + min(orders/200, 0.2), capped at 0.95
-    """
+    # Statistical confidence based on sample size.
     if order_count < 10 {
         return 0.2;
     }
@@ -140,13 +112,7 @@ def compute_confidence(order_count: int, return_count: int) -> float {
 }
 
 def compute_quality_score(error_count: int, warning_count: int, info_count: int) -> int {
-    """
-    Rule-based quality score Q(p) in [0, 100].
-
-    Q(p) = max(0, min(100, 100 - 20*E - 10*W - 3*I))
-
-    Where E = error count, W = warning count, I = info count.
-    """
+    # Rule-based quality score Q(p) in [0, 100].
     score = 100 - error_count * 20 - warning_count * 10 - info_count * 3;
     return max(0, min(100, score));
 }

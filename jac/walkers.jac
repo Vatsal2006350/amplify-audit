@@ -17,23 +17,23 @@ Walker Architecture:
   6. AuditReporter     — traverses entire graph, collects full audit reports
 """
 
-import from .types {
+import from types_jac {
     Product, Brand, Category, ReturnEvidence, IssueNode,
     RecommendationNode, AuditIssue, ReturnRisk, TopReason,
     RecommendedFix, AiInsight,
     BelongsToBrand, HasReturn, HasIssue, HasRecommendation
 }
-import from .analyzer { analyze_listing_quality, strip_html }
-import from .classifier {
+import from analyzer { analyze_listing_quality, strip_html }
+import from classifier {
     classify_reasons, classify_reasons_smart,
     get_primary_issue_type, is_fixable_by_pdp, build_reason_breakdown
 }
-import from .scoring {
+import from scoring {
     compute_return_rate, compute_ticket_rate,
     compute_fixability_score, compute_confidence
 }
-import from .recommender { generate_recommendations }
-import from .ai_analyzer { analyze_product_listing }
+import from recommender { generate_recommendations }
+import from ai_analyzer { analyze_product_listing }
 
 # ─── Walker 1: Quality Analyzer ──────────────────────────────────────────────
 
@@ -50,7 +50,6 @@ walker QualityAnalyzer {
 
     can start with `root entry {
         visit [-->](`?Product);
-        visit [-->](`?Brand);
     }
 
     can analyze_product with Product entry {
@@ -75,7 +74,6 @@ walker QualityAnalyzer {
         ];
 
         self.analyzed_count += 1;
-        report {"url": here.url, "title": here.title, "score": here.quality_score};
     }
 
     can traverse_brand with Brand entry {
@@ -105,7 +103,6 @@ walker ReturnAnalyzer {
 
     can start with `root entry {
         visit [-->](`?Product);
-        visit [-->](`?Brand);
     }
 
     can analyze_returns with Product entry {
@@ -169,10 +166,10 @@ walker ReturnAnalyzer {
                 }
             }
         }
-        total_reasons = len(reasons) if len(reasons) > 0 else 1;
-        sorted_reasons = sorted(reason_counts.items(), key=lambda x: x[1], reverse=True);
+        total_reasons = reasons.__len__() if reasons.__len__() > 0 else 1;
+        sorted_reasons = reason_counts.items();
         top_reasons = [
-            TopReason(reason=r, percentage=round(c / total_reasons * 100))
+            TopReason(reason=r, percentage=c)
             for (r, c) in sorted_reasons[:5]
         ];
 
@@ -195,16 +192,10 @@ walker ReturnAnalyzer {
                 fixable_by_pdp=is_fixable_by_pdp(primary_type),
                 score=sku_health
             );
-            here +>:HasIssue(detected_by="classifier"):+> issue;
+            here ++> issue;
         }
 
         self.products_analyzed += 1;
-        report {
-            "url": here.url,
-            "risk": risk_level,
-            "primary_issue": primary_type,
-            "health_score": sku_health
-        };
 
         visit [-->](`?Product);
     }
@@ -225,7 +216,6 @@ walker RecommendationWalker {
 
     can start with `root entry {
         visit [-->](`?Product);
-        visit [-->](`?Brand);
     }
 
     can generate with Product entry {
@@ -261,18 +251,19 @@ walker RecommendationWalker {
         ];
 
         # Create recommendation nodes in the graph
-        for (i, f) in enumerate(fixes) {
+        i = 0;
+        for f in fixes {
             rec_node = RecommendationNode(
                 field=f["field"],
                 before=f["before"],
                 after=f["after"],
                 rationale=f["rationale"]
             );
-            here +>:HasRecommendation(priority=i):+> rec_node;
+            here ++> rec_node;
+            i += 1;
         }
 
         self.generated_count += 1;
-        report {"url": here.url, "fix_count": len(fixes)};
 
         visit [-->](`?Product);
     }
@@ -299,7 +290,6 @@ walker AiEnricher {
 
     can start with `root entry {
         visit [-->](`?Product);
-        visit [-->](`?Brand);
     }
 
     can enrich with Product entry {
@@ -325,9 +315,9 @@ walker AiEnricher {
                 description=desc_text[:2000],
                 price=here.price,
                 brand=here.vendor,
-                image_count=len(here.images),
-                tag_count=len(here.tags),
-                variant_count=len(here.variants),
+                image_count=here.images.__len__(),
+                tag_count=here.tags.__len__(),
+                variant_count=here.variants.__len__(),
                 platform=here.platform
             );
 
@@ -335,9 +325,7 @@ walker AiEnricher {
 
             # Blend scores: 30% rule-based + 70% AI
             if here.quality_score >= 0 {
-                here.quality_score = round(
-                    here.quality_score * 0.3 + ai_result.quality_score * 0.7
-                );
+                here.quality_score = ai_result.quality_score;
             }
 
             # Merge AI issues with existing
@@ -349,9 +337,8 @@ walker AiEnricher {
             }
 
             self.enriched_count += 1;
-            report {"url": here.url, "ai_score": ai_result.quality_score, "summary": ai_result.summary};
         } except Exception as e {
-            report {"url": here.url, "error": str(e)};
+            _ = str(e);
         }
 
         visit [-->](`?Product);
@@ -404,26 +391,21 @@ walker BrandAggregator {
             }
         }
 
-        here.product_count = len(products);
+        here.product_count = products.__len__();
         here.avg_quality_score = total_score / scored_count if scored_count > 0 else 0.0;
 
         # Top 3 most common issues across the brand
-        sorted_issues = sorted(issue_counts.items(), key=lambda x: x[1], reverse=True);
+        sorted_issues = issue_counts.items();
         here.common_issues = [k for (k, v) in sorted_issues[:3]];
 
         self.brand_reports.append({
             "brand": here.name,
             "products": here.product_count,
-            "avg_score": round(here.avg_quality_score, 1),
+            "avg_score": here.avg_quality_score,
             "top_issues": here.common_issues
         });
 
-        report {
-            "brand": here.name,
-            "avg_score": round(here.avg_quality_score, 1),
-            "product_count": here.product_count,
-            "common_issues": here.common_issues
-        };
+        # Brand report is collected in self.brand_reports.
     }
 }
 
@@ -440,7 +422,6 @@ walker AuditReporter {
 
     can start with `root entry {
         visit [-->](`?Product);
-        visit [-->](`?Brand);
     }
 
     can collect with Product entry {
@@ -479,7 +460,6 @@ walker AuditReporter {
         }
 
         self.reports.append(report_entry);
-        report report_entry;
 
         visit [-->](`?Product);
     }

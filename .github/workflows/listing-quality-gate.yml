@@ -1,0 +1,23 @@
+name: listing-quality-gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      PRODUCT_URL: https://allbirds.com/products/mens-tree-runners
+      MIN_SCORE: "70"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run listing quality gate
+        run: npx amplify-audit "${PRODUCT_URL}" --min-score "${MIN_SCORE}" --json

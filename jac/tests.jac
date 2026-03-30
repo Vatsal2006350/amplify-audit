@@ -5,59 +5,59 @@ Tests cover: scoring algorithms, classification, quality analysis,
 graph construction, and walker traversal.
 """
 
-import from .types {
+import from types_jac {
     Product, Brand, ReturnEvidence, Variant, AuditIssue,
     RecommendedFix, TopReason, ReturnRisk,
     BelongsToBrand, HasReturn
 }
-import from .scoring {
+import from scoring {
     compute_return_rate, compute_ticket_rate,
     compute_reason_concentration, compute_fixability_score,
     compute_confidence, compute_quality_score
 }
-import from .classifier {
+import from classifier {
     classify_text, classify_reasons, get_primary_issue_type,
     is_fixable_by_pdp, build_reason_breakdown
 }
-import from .analyzer { analyze_listing_quality, strip_html }
-import from .walkers { QualityAnalyzer, BrandAggregator, AuditReporter }
+import from analyzer { analyze_listing_quality, strip_html }
+import from walkers { QualityAnalyzer, BrandAggregator, AuditReporter }
 
 # ─── Scoring Tests ───────────────────────────────────────────────────────────
 
-test "return rate computation" {
+test return_rate_computation {
     assert compute_return_rate(25, 100) == 0.25;
     assert compute_return_rate(0, 100) == 0.0;
     assert compute_return_rate(10, 0) == 0.0;
 }
 
-test "ticket rate computation" {
+test ticket_rate_computation {
     assert compute_ticket_rate(5, 100) == 0.05;
     assert compute_ticket_rate(0, 50) == 0.0;
 }
 
-test "reason concentration - single reason is 1.0" {
+test reason_concentration_single_reason {
     assert compute_reason_concentration({"too small": 10}) == 1.0;
 }
 
-test "reason concentration - uniform distribution is 0.0" {
+test reason_concentration_uniform_distribution {
     result = compute_reason_concentration({
         "a": 1, "b": 1, "c": 1, "d": 1
     });
     assert result < 0.01;
 }
 
-test "reason concentration - empty is 0.0" {
+test reason_concentration_empty_distribution {
     assert compute_reason_concentration({}) == 0.0;
 }
 
-test "confidence scales with sample size" {
+test confidence_scales_with_sample_size {
     assert compute_confidence(5, 2) == 0.2;
     assert compute_confidence(20, 5) == 0.4;
     assert compute_confidence(40, 10) == 0.6;
     assert compute_confidence(100, 20) > 0.7;
 }
 
-test "quality score deductions" {
+test quality_score_deductions {
     assert compute_quality_score(0, 0, 0) == 100;
     assert compute_quality_score(1, 0, 0) == 80;
     assert compute_quality_score(0, 1, 0) == 90;
@@ -67,36 +67,36 @@ test "quality score deductions" {
 
 # ─── Classifier Tests ────────────────────────────────────────────────────────
 
-test "classify sizing keywords" {
+test classify_sizing_keywords {
     result = classify_text("This shirt runs small and is too tight");
     assert "sizing" in result;
     assert result["sizing"] >= 2;
 }
 
-test "classify quality keywords" {
+test classify_quality_keywords {
     result = classify_text("The product was defective and fell apart quickly");
     assert "quality" in result;
 }
 
-test "classify color mismatch" {
+test classify_color_mismatch {
     result = classify_text("The color is different from the picture");
     assert "color_mismatch" in result;
 }
 
-test "classify multiple reasons aggregation" {
+test classify_multiple_reasons_aggregation {
     reasons = ["too small", "runs small", "poor quality", "too tight"];
     result = classify_reasons(reasons);
     primary = get_primary_issue_type(result);
     assert primary == "sizing";
 }
 
-test "fixable by PDP" {
+test fixable_by_pdp {
     assert is_fixable_by_pdp("sizing") == True;
     assert is_fixable_by_pdp("description_mismatch") == True;
     assert is_fixable_by_pdp("quality") == False;
 }
 
-test "reason breakdown" {
+test reason_breakdown {
     reasons = ["too small", "Too Small", "wrong color", "too small"];
     bd = build_reason_breakdown(reasons);
     assert bd["too small"] == 3;
@@ -105,7 +105,7 @@ test "reason breakdown" {
 
 # ─── Analyzer Tests ──────────────────────────────────────────────────────────
 
-test "missing title is an error" {
+test missing_title_is_error {
     result = analyze_listing_quality(
         title="",
         description="A great product with lots of details about sizing and materials.",
@@ -119,7 +119,7 @@ test "missing title is an error" {
     assert len(errors) > 0;
 }
 
-test "search results scored leniently" {
+test search_results_scored_leniently {
     result = analyze_listing_quality(
         title="Nice Product With A Good Title For SEO Purposes",
         description="",
@@ -135,14 +135,14 @@ test "search results scored leniently" {
     assert len(desc_errors) == 0;
 }
 
-test "strip html removes tags" {
+test strip_html_removes_tags {
     assert strip_html("<p>Hello <b>world</b></p>") == "Hello world";
     assert strip_html("plain text") == "plain text";
 }
 
 # ─── Graph + Walker Tests ────────────────────────────────────────────────────
 
-test "graph construction and quality walker" {
+test graph_construction_and_quality_walker {
     # Build a small graph
     p1 = Product(
         url="https://example.com/p1",
@@ -161,7 +161,7 @@ test "graph construction and quality walker" {
     assert results is not None;
 }
 
-test "brand aggregation walker" {
+test brand_aggregation_walker {
     brand = Brand(name="TestBrand");
     p1 = Product(
         title="Product A", quality_score=80,
@@ -180,7 +180,7 @@ test "brand aggregation walker" {
     assert results is not None;
 }
 
-test "return evidence attached to products" {
+test return_evidence_attached_to_products {
     product = Product(url="https://test.com/p1", title="Test Product");
     ev1 = ReturnEvidence(reason="too small", count=3);
     ev2 = ReturnEvidence(reason="wrong color", count=1);

@@ -8,13 +8,12 @@ The analyzer checks: title quality, description completeness,
 sizing/material/care info presence, image count, tags, price, and vendor.
 """
 
-import from re { search as re_search }
+import from re { search as re_search, sub as re_sub }
 
 # ─── HTML Stripping ──────────────────────────────────────────────────────────
 
 def strip_html(html: str) -> str {
-    """Remove HTML tags and normalize whitespace."""
-    import from re { sub as re_sub }
+    # Remove HTML tags and normalize whitespace.
     text = re_sub("<[^>]*>", " ", html);
     text = re_sub("\\s+", " ", text);
     return text.strip();
@@ -31,15 +30,7 @@ def analyze_listing_quality(
     vendor: str,
     source: str
 ) -> dict {
-    """
-    Analyze listing quality using rule-based heuristics.
-
-    Returns {"quality_score": int, "issues": list[dict]}
-    where each issue has keys: severity, category, message.
-
-    Source-aware: search results (source='search') are scored more leniently
-    since they contain only partial data (title, price, thumbnail).
-    """
+    # Analyze listing quality using rule-based heuristics.
     issues: list = [];
     is_search = source == "search";
     desc_text = strip_html(description);
@@ -49,7 +40,7 @@ def analyze_listing_quality(
         issues.append({"severity": "error", "category": "title",
                        "message": "Product title is missing"});
     } else {
-        title_len = len(title);
+        title_len = title.__len__();
         if title_len < 20 {
             issues.append({"severity": "error", "category": "title",
                            "message": f"Title is too short ({title_len} chars). Aim for 50-80 characters."});
@@ -66,7 +57,7 @@ def analyze_listing_quality(
                            "message": "Title is in ALL CAPS. Use title case for better readability."});
         }
 
-        separators = len(title.split(",")) + len(title.split("|")) + len(title.split("/")) - 2;
+        separators = title.split(",").__len__() + title.split("|").__len__() + title.split("/").__len__() - 2;
         if separators > 6 {
             issues.append({"severity": "info", "category": "title",
                            "message": "Title may have too many separators. Clean, readable titles convert better."});
@@ -75,11 +66,11 @@ def analyze_listing_quality(
 
     # ─── Description checks (skip for search results) ────────────────
     if not is_search {
-        if not desc_text or len(desc_text) < 10 {
+        if not desc_text or desc_text.__len__() < 10 {
             issues.append({"severity": "error", "category": "description",
                            "message": "Product description is missing or empty"});
         } else {
-            desc_len = len(desc_text);
+            desc_len = desc_text.__len__();
             if desc_len < 100 {
                 issues.append({"severity": "error", "category": "description",
                                "message": f"Description is too short ({desc_len} chars). Target 300-1000 characters."});
@@ -121,15 +112,15 @@ def analyze_listing_quality(
 
     # ─── Image checks ────────────────────────────────────────────────
     if not is_search {
-        if len(images) == 0 {
+        if images.__len__() == 0 {
             issues.append({"severity": "error", "category": "images",
                            "message": "No product images found"});
-        } elif len(images) < 3 {
+        } elif images.__len__() < 3 {
             issues.append({"severity": "warning", "category": "images",
-                           "message": f"Only {len(images)} image(s). Aim for 4+ images with lifestyle and detail shots."});
+                           "message": f"Only {images.__len__()} image(s). Aim for 4+ images with lifestyle and detail shots."});
         }
     } else {
-        if len(images) == 0 {
+        if images.__len__() == 0 {
             issues.append({"severity": "warning", "category": "images",
                            "message": "No product image in listing"});
         }
@@ -137,12 +128,12 @@ def analyze_listing_quality(
 
     # ─── Tag checks (skip for search) ────────────────────────────────
     if not is_search {
-        if len(tags) == 0 {
+        if tags.__len__() == 0 {
             issues.append({"severity": "warning", "category": "tags",
                            "message": "No tags/categories found. Tags improve discoverability."});
-        } elif len(tags) < 3 {
+        } elif tags.__len__() < 3 {
             issues.append({"severity": "info", "category": "tags",
-                           "message": f"Only {len(tags)} tag(s). Consider adding more for better discoverability."});
+                           "message": f"Only {tags.__len__()} tag(s). Consider adding more for better discoverability."});
         }
     }
 
@@ -159,9 +150,9 @@ def analyze_listing_quality(
     }
 
     # ─── Compute score ───────────────────────────────────────────────
-    error_count = len([i for i in issues if i["severity"] == "error"]);
-    warning_count = len([i for i in issues if i["severity"] == "warning"]);
-    info_count = len([i for i in issues if i["severity"] == "info"]);
+    error_count = [i for i in issues if i["severity"] == "error"].__len__();
+    warning_count = [i for i in issues if i["severity"] == "warning"].__len__();
+    info_count = [i for i in issues if i["severity"] == "info"].__len__();
 
     quality_score = max(0, min(100, 100 - error_count * 20 - warning_count * 10 - info_count * 3));
 

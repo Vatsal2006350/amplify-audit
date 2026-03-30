@@ -18,7 +18,7 @@ def strip_html(html: str) -> str {
 
 def truncate(text: str, max_len: int) -> str {
     clean = strip_html(text);
-    if len(clean) <= max_len {
+    if clean.__len__() <= max_len {
         return clean;
     }
     return clean[:max_len] + "...";
@@ -26,10 +26,10 @@ def truncate(text: str, max_len: int) -> str {
 
 def append_to_description(existing: str, addition: str) -> str {
     trimmed = existing.strip() if existing else "";
-    if len(trimmed) < 10 {
+    if trimmed.__len__() < 10 {
         return addition;
     }
-    return truncate(trimmed, 300) + "\n\n" + addition;
+    return f"{truncate(trimmed, 300)}\n\n{addition}";
 }
 
 # ─── Recommendation Generation ───────────────────────────────────────────────
@@ -40,14 +40,7 @@ def generate_recommendations(
     primary_issue_type: str,
     return_rate: float
 ) -> list[dict] {
-    """
-    Generate PDP improvement recommendations based on detected issue type.
-
-    Each recommendation is a dict with: field, before, after, rationale.
-
-    The recommendations are deterministic templates parameterized by
-    the primary issue type and current listing content.
-    """
+    # Generate PDP improvement recommendations based on detected issue type.
     fixes: list = [];
 
     # ─── Issue-specific fixes ────────────────────────────────────────
@@ -95,7 +88,7 @@ def generate_recommendations(
     }
 
     if primary_issue_type == "missing_info" {
-        missing: list = [];
+        missing: list[str] = [];
         lower = description.lower() if description else "";
         if not re_search("\\b(size|sizing|fit|measurement)\\b", lower) {
             missing.append("sizing/fit information");
@@ -107,8 +100,17 @@ def generate_recommendations(
             missing.append("care instructions");
         }
 
-        if len(missing) > 0 {
+        if missing.__len__() > 0 {
             placeholders = " ".join([f"[Add {m}]" for m in missing]);
+            missing_str = "";
+            idx = 0;
+            for m in missing {
+                if idx > 0 {
+                    missing_str = f"{missing_str}, ";
+                }
+                missing_str = f"{missing_str}{m}";
+                idx += 1;
+            }
             fixes.append({
                 "field": "description",
                 "before": truncate(description, 200),
@@ -116,14 +118,14 @@ def generate_recommendations(
                     description,
                     f"<p><strong>Details:</strong> {placeholders}</p>"
                 ),
-                "rationale": f"Missing critical product info: {', '.join(missing)}. Adding these reduces uncertainty-driven returns."
+                "rationale": f"Missing critical product info: {missing_str}. Adding these reduces uncertainty-driven returns."
             });
         }
     }
 
     # ─── Generic fixes ───────────────────────────────────────────────
 
-    if title and len(title) < 30 {
+    if title and title.__len__() < 30 {
         fixes.append({
             "field": "title",
             "before": title,
@@ -133,7 +135,7 @@ def generate_recommendations(
     }
 
     desc_text = strip_html(description) if description else "";
-    if len(desc_text) < 50 {
+    if desc_text.__len__() < 50 {
         fixes.append({
             "field": "description",
             "before": description if description else "(empty)",

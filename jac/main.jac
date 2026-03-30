@@ -19,21 +19,22 @@ The graph topology:
         └──[InCategory]── Product(...)
 """
 
-import from .types {
+import from types_jac {
     Product, Brand, Category, ReturnEvidence,
     Variant, AuditIssue, RecommendedFix,
     BelongsToBrand, InCategory, HasReturn
 }
-import from .walkers {
+import from walkers {
     QualityAnalyzer, ReturnAnalyzer, RecommendationWalker,
     AiEnricher, BrandAggregator, AuditReporter
 }
-import from .seo_analyzer { SEOAnalyzer }
-import from .trend_analyzer { TrendAnalyzer, analyze_trends }
-import from .fetcher { fetch_product, fetch_store, detect_platform }
-import from .export { export_json, export_csv, export_markdown, export_to_file }
+import from seo_analyzer { SEOAnalyzer }
+import from trend_analyzer { TrendAnalyzer, analyze_trends }
+import from fetcher { fetch_product, fetch_store, detect_platform }
+import from export { export_json, export_csv, export_markdown, export_to_file }
 import sys;
 import json;
+import os;
 
 # ─── Graph Construction ──────────────────────────────────────────────────────
 
@@ -41,18 +42,8 @@ def build_product_graph(
     products: list[dict],
     return_data: dict | None = None
 ) -> None {
-    """
-    Ingest raw product data into the graph rooted at `root`.
-
-    Products are connected to Brand nodes (deduped by vendor name)
-    and optionally to ReturnEvidence nodes.
-
-    Args:
-      products: List of dicts with keys matching Product fields
-      return_data: Optional dict mapping product URL to return info:
-                   {"reasons": [...], "order_count": N, "return_count": N}
-    """
-    brand_map: dict = {};
+    # Ingest raw products into the graph rooted at `root`.
+    brand_map: dict[str, Brand] = {};
 
     for p_data in products {
         # Create product node
@@ -90,7 +81,8 @@ def build_product_graph(
                 root ++> brand_node;
                 brand_map[vendor] = brand_node;
             }
-            brand_map[vendor] +>:BelongsToBrand:+> product;
+            brand_node = brand_map[vendor];
+            brand_node ++> product;
         }
 
         # Attach return evidence if available
@@ -119,23 +111,7 @@ def audit_single(
     return_data: dict | None = None,
     use_ai: bool = False
 ) -> dict {
-    """
-    Audit a single product listing.
-
-    This is the Jac equivalent of the TypeScript `audit()` function.
-    Instead of calling functions sequentially, we:
-      1. Build a graph with the product
-      2. Spawn walkers to traverse and analyze
-      3. Collect results via reports
-
-    Args:
-      product_data: Dict with product fields (title, description, etc.)
-      return_data: Optional return info dict with reasons, order_count, etc.
-      use_ai: Whether to enrich with LLM analysis
-
-    Returns:
-      Full audit report dict
-    """
+    # Audit a single product listing through the walker pipeline.
     # Build graph
     ret_map: dict | None = None;
     if return_data {
@@ -166,8 +142,8 @@ def audit_single(
 
     # Phase 5: Collect report
     reporter = root spawn AuditReporter();
-    if reporter {
-        return reporter;
+    if reporter and hasattr(reporter, "reports") and reporter.reports {
+        return reporter.reports[0];
     }
     return {};
 }
@@ -180,26 +156,7 @@ def audit_catalog(
     use_ai: bool = False,
     max_ai_products: int = 20
 ) -> dict {
-    """
-    Audit an entire catalog of products.
-
-    Builds a full product graph and spawns walkers for
-    quality analysis, return analysis, recommendations,
-    optional AI enrichment, and brand aggregation.
-
-    Returns:
-      {
-        "products": [...audit reports...],
-        "brands": [...brand summaries...],
-        "ai_powered": bool,
-        "summary": {
-          "total": int,
-          "avg_quality": float,
-          "critical_count": int,
-          "fixable_count": int
-        }
-      }
-    """
+    # Audit an entire product catalog and return aggregate results.
     # Build the full graph
     build_product_graph(products, return_data);
 
@@ -226,15 +183,14 @@ def audit_catalog(
 
     # Phase 6: Collect all reports
     reporter = root spawn AuditReporter();
+    reports = reporter.reports if reporter and hasattr(reporter, "reports") else [];
 
     # Compute summary statistics
-    total = len(reporter) if reporter else 0;
+    total = reports.__len__();
     total_score = 0;
     scored = 0;
     critical = 0;
     fixable = 0;
-
-    reports = reporter if reporter else [];
     for r in reports {
         if isinstance(r, dict) {
             score = r.get("quality_score", -1);
@@ -260,7 +216,7 @@ def audit_catalog(
         "ai_powered": ai_powered,
         "summary": {
             "total": total,
-            "avg_quality": round(total_score / scored, 1) if scored > 0 else 0.0,
+            "avg_quality": (total_score / scored) if scored > 0 else 0.0,
             "critical_count": critical,
             "fixable_count": fixable
         }
@@ -270,8 +226,15 @@ def audit_catalog(
 # ─── CLI Argument Parsing ────────────────────────────────────────────────────
 
 def parse_args() -> dict {
-    """Parse command-line arguments."""
-    args = sys.argv[1:];
+    # Parse command-line arguments.
+    raw_args: list[str] = [a for a in sys.argv[1:]];
+    args: list[str] = [];
+    for a in raw_args {
+        if a in ["run", "main.jac", "jac/main.jac"] {
+            continue;
+        }
+        args.append(a);
+    }
     opts: dict = {
         "url": "",
         "store": False,
@@ -285,8 +248,9 @@ def parse_args() -> dict {
         "help": False
     };
 
+    arg_count = args.__len__();
     i = 0;
-    while i < len(args) {
+    while i < arg_count {
         arg = args[i];
         if arg in ["--help", "-h"] {
             opts["help"] = True;
@@ -302,16 +266,16 @@ def parse_args() -> dict {
             opts["format"] = "csv";
         } elif arg == "--markdown" or arg == "--md" {
             opts["format"] = "markdown";
-        } elif arg in ["--output", "-o"] and i + 1 < len(args) {
+        } elif arg in ["--output", "-o"] and i + 1 < arg_count {
             i += 1;
             opts["output"] = args[i];
-        } elif arg == "--max" and i + 1 < len(args) {
+        } elif arg == "--max" and i + 1 < arg_count {
             i += 1;
             opts["max_products"] = int(args[i]);
-        } elif arg == "--min-score" and i + 1 < len(args) {
+        } elif arg == "--min-score" and i + 1 < arg_count {
             i += 1;
             opts["min_score"] = int(args[i]);
-        } elif arg == "--returns" and i + 1 < len(args) {
+        } elif arg == "--returns" and i + 1 < arg_count {
             i += 1;
             opts["returns_file"] = args[i];
         } elif not arg.startswith("-") and not opts["url"] {
@@ -319,17 +283,23 @@ def parse_args() -> dict {
         }
         i += 1;
     }
+    if not opts["url"] {
+        env_url = os.getenv("AMPLIFY_AUDIT_URL");
+        if env_url {
+            opts["url"] = env_url;
+        }
+    }
     return opts;
 }
 
 def print_help() -> None {
-    """Print CLI usage help."""
+    # Print CLI usage help.
     print("amplify-audit: Data-Spatial Product Quality Analysis");
     print("====================================================");
     print("");
     print("Usage:");
-    print("  jac run main.jac <url>           Audit a single product");
-    print("  jac run main.jac <url> --store   Audit an entire store");
+    print("  AMPLIFY_AUDIT_URL=<url> jac run main.jac           Audit a single product");
+    print("  AMPLIFY_AUDIT_URL=<url> jac run main.jac --store   Audit an entire store");
     print("  jac start api.jac                Start REST API server");
     print("");
     print("Options:");
@@ -347,9 +317,9 @@ def print_help() -> None {
     print("  --help, -h           Show this help");
     print("");
     print("Examples:");
-    print("  jac run main.jac https://allbirds.com/products/mens-tree-runners");
-    print("  jac run main.jac https://allbirds.com --store --json -o report.json");
-    print("  jac run main.jac https://amazon.com/dp/B08N5WRWNW --ai");
+    print("  AMPLIFY_AUDIT_URL=https://allbirds.com/products/mens-tree-runners jac run main.jac");
+    print("  AMPLIFY_AUDIT_URL=https://allbirds.com jac run main.jac --store --json -o report.json");
+    print("  AMPLIFY_AUDIT_URL=https://amazon.com/dp/B08N5WRWNW jac run main.jac --ai");
     print("");
     print("API Server:");
     print("  jac start api.jac --port 8002");
@@ -358,11 +328,11 @@ def print_help() -> None {
     print('    -d \'{"url": "https://allbirds.com/products/mens-tree-runners"}\'');
 }
 
-def print_report(report: dict, min_score: int = 0) -> None {
-    """Pretty-print a single product audit report."""
-    title = report.get("title", "Unknown");
-    score = report.get("quality_score", -1);
-    url = report.get("url", "");
+def print_report(report_data: dict, min_score: int = 0) -> None {
+    # Pretty-print a single product audit report.
+    title = report_data.get("title", "Unknown");
+    score = report_data.get("quality_score", -1);
+    url = report_data.get("url", "");
 
     if min_score > 0 and score >= min_score {
         return;
@@ -380,7 +350,7 @@ def print_report(report: dict, min_score: int = 0) -> None {
     print(f"  Quality Score: {score}/100");
 
     # Issues
-    issues = report.get("issues", []);
+    issues = report_data.get("issues", []);
     if issues {
         errors = [i for i in issues if i.get("severity") == "error"];
         warnings = [i for i in issues if i.get("severity") == "warning"];
@@ -394,7 +364,7 @@ def print_report(report: dict, min_score: int = 0) -> None {
     }
 
     # Return risk
-    risk = report.get("return_risk", None);
+    risk = report_data.get("return_risk", None);
     if isinstance(risk, dict) and risk.get("score") {
         print(f"  Return Risk: {risk['score']}");
         if risk.get("primary_issue_type") {
@@ -406,13 +376,26 @@ def print_report(report: dict, min_score: int = 0) -> None {
     }
 
     # Recommendations
-    recs = report.get("recommendations", []);
+    recs = report_data.get("recommendations", []);
     if recs {
         print(f"  Recommendations: {len(recs)}");
         for r in recs[:2] {
             print(f"    - {r.get('field', '')}: {r.get('rationale', '')}");
         }
     }
+}
+
+def dedupe_reports(reports: list[dict]) -> list[dict] {
+    unique: list[dict] = [];
+    seen: dict[str, bool] = {};
+    for r in reports {
+        key = f"{r.get('url', '')}|{r.get('title', '')}";
+        if key not in seen {
+            seen[key] = True;
+            unique.append(r);
+        }
+    }
+    return unique;
 }
 
 # ─── Entry Point ─────────────────────────────────────────────────────────────
@@ -443,7 +426,7 @@ with entry {
             # Store-wide audit
             print(f"Fetching products from store (max {opts['max_products']})...");
             products = fetch_store(url, opts["max_products"]);
-            print(f"Fetched {len(products)} products. Building graph...");
+            print(f"Fetched {products.__len__()} products. Building graph...");
 
             result = audit_catalog(products, return_data, opts["ai"], min(20, opts["max_products"]));
 
@@ -459,8 +442,9 @@ with entry {
 
             # Output
             reports = result.get("products", []);
+            reports = dedupe_reports(reports);
             if opts["format"] == "json" {
-                output = export_json(result);
+                output = export_json([result]);
                 if opts["output"] {
                     export_to_file([result], opts["output"], "json");
                     print(f"Report saved to {opts['output']}");
@@ -528,7 +512,8 @@ with entry {
 
                 # Re-collect report with SEO data
                 reporter = root spawn AuditReporter();
-                reports = reporter if reporter else [];
+                reports = reporter.reports if reporter and hasattr(reporter, "reports") else [];
+                reports = dedupe_reports(reports);
 
                 if opts["format"] == "json" {
                     output = export_json(reports);

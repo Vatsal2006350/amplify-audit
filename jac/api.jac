@@ -19,19 +19,19 @@ Then:
 
 import from http { HTTPMethod }
 
-import from .types {
+import from types_jac {
     Product, Brand, ReturnEvidence, AuditIssue, RecommendedFix,
     BelongsToBrand, HasReturn
 }
-import from .fetcher { fetch_product, fetch_store, detect_platform }
-import from .walkers {
+import from fetcher { fetch_product, fetch_store, detect_platform }
+import from walkers {
     QualityAnalyzer, ReturnAnalyzer, RecommendationWalker,
     AiEnricher, BrandAggregator, AuditReporter
 }
-import from .seo_analyzer { SEOAnalyzer }
-import from .trend_analyzer { TrendAnalyzer, analyze_trends }
-import from .export { export_json, export_csv, export_markdown }
-import from .main { build_product_graph }
+import from seo_analyzer { SEOAnalyzer }
+import from trend_analyzer { TrendAnalyzer, analyze_trends }
+import from export { export_json, export_csv, export_markdown }
+import from main { build_product_graph }
 
 # ─── Health Check ────────────────────────────────────────────────────────────
 
@@ -183,7 +183,7 @@ walker :pub audit_catalog {
             "summary": {
                 "total": total,
                 "avg_quality": round(avg_score, 1),
-                "products_fetched": len(products)
+                "products_fetched": products.__len__()
             }
         };
     }

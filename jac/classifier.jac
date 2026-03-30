@@ -9,7 +9,7 @@ The keyword classifier provides a fast, zero-dependency baseline.
 The LLM classifier adds semantic understanding for ambiguous reasons.
 """
 
-import from .types { IssueType }
+import from types_jac { IssueType }
 
 # ─── Keyword Dictionaries ────────────────────────────────────────────────────
 
@@ -60,12 +60,7 @@ glob FIXABLE_TYPES: list[str] = [
 # ─── Keyword Classification ──────────────────────────────────────────────────
 
 def classify_text(text: str) -> dict {
-    """
-    Classify a single text against all issue categories using keyword matching.
-
-    Returns dict mapping issue_type -> hit count.
-    Time complexity: O(|text| * |keywords|).
-    """
+    # Classify a single text against all issue categories.
     lower = text.lower();
     scores: dict = {};
 
@@ -87,13 +82,8 @@ def classify_text(text: str) -> dict {
 }
 
 def classify_reasons(reasons: list[str]) -> dict {
-    """
-    Classify multiple return reasons. Aggregates keyword hits across all reasons.
-
-    For n reasons with m keywords per category:
-      Time: O(n * m * k) where k = number of categories
-    """
-    aggregate: dict = {};
+    # Classify multiple return reasons and aggregate keyword hits.
+    aggregate: dict[str, int] = {};
 
     for reason in reasons {
         scores = classify_text(reason);
@@ -110,12 +100,12 @@ def classify_reasons(reasons: list[str]) -> dict {
 }
 
 def is_fixable_by_pdp(issue_type: str) -> bool {
-    """Whether this issue type can be addressed by PDP content changes."""
+    # Whether this issue type can be addressed by PDP content changes.
     return issue_type in FIXABLE_TYPES;
 }
 
 def get_primary_issue_type(scores: dict) -> str {
-    """Get the dominant issue type from classification scores."""
+    # Get the dominant issue type from classification scores.
     max_type = "";
     max_score = 0;
 
@@ -130,8 +120,8 @@ def get_primary_issue_type(scores: dict) -> str {
 }
 
 def build_reason_breakdown(reasons: list[str]) -> dict {
-    """Build frequency distribution of normalized return reasons."""
-    breakdown: dict = {};
+    # Build frequency distribution of normalized return reasons.
+    breakdown: dict[str, int] = {};
     for reason in reasons {
         trimmed = reason.strip().lower();
         if trimmed {
@@ -162,16 +152,9 @@ even though it doesn't contain the word 'size'.
 sem classify_reason_llm.reason = "The customer's stated reason for returning the product";
 
 def classify_reasons_smart(reasons: list[str], use_llm: bool = False) -> dict {
-    """
-    Hybrid classifier: uses LLM when available, falls back to keywords.
-
-    The LLM classifier handles ambiguous cases like:
-      - 'way too snug around the chest' -> SIZING (no keyword match)
-      - 'nothing like the photos' -> DESCRIPTION_MISMATCH
-      - 'feels cheap and flimsy' -> QUALITY
-    """
-    if use_llm and len(reasons) <= 50 {
-        scores: dict = {};
+    # Hybrid classifier: uses LLM when available, falls back to keywords.
+    if use_llm and reasons.__len__() <= 50 {
+        scores: dict[str, int] = {};
         for reason in reasons {
             try {
                 result = classify_reason_llm(reason);

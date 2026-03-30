@@ -103,7 +103,6 @@ def _strip_html_tags(text):
 # ─── Platform Detection ─────────────────────────────────────────────────────
 
 def detect_platform(url: str) -> str {
-    """Detect e-commerce platform from URL."""
     lower = url.lower();
     if "amazon.com" in lower or "amazon.co" in lower or "amzn." in lower {
         return "amazon";
@@ -118,7 +117,6 @@ def detect_platform(url: str) -> str {
 }
 
 def is_store_url(url: str) -> bool {
-    """Check if URL is a store root (not a single product page)."""
     lower = url.lower();
     if "/products/" in lower and not lower.endswith("/products/") and not lower.endswith("/products") {
         return False;
@@ -132,8 +130,7 @@ def is_store_url(url: str) -> bool {
 # ─── Shopify Fetcher ─────────────────────────────────────────────────────────
 
 def fetch_shopify_product(url: str) -> dict {
-    """Fetch a Shopify product via the .json API endpoint."""
-    json_url = url.rstrip("/") + ".json";
+    json_url = f"{url.rstrip('/')}.json";
     data = _fetch_json(json_url);
 
     if not data or "product" not in data {
@@ -168,15 +165,15 @@ def fetch_shopify_product(url: str) -> dict {
 }
 
 def fetch_shopify_store(store_url: str, max_products: int = 100) -> list[dict] {
-    """Fetch all products from a Shopify store via /products.json."""
+    # Fetch all products from a Shopify store via /products.json.
     products: list[dict] = [];
     page = 1;
 
-    while len(products) < max_products {
+    while products.__len__() < max_products {
         api_url = f"{store_url.rstrip('/')}/products.json?limit=250&page={page}";
         data = _fetch_json(api_url);
 
-        if not data or "products" not in data or len(data["products"]) == 0 {
+        if not data or "products" not in data or data["products"].__len__() == 0 {
             break;
         }
 
@@ -205,7 +202,7 @@ def fetch_shopify_store(store_url: str, max_products: int = 100) -> list[dict] {
                 "variants": variants
             });
 
-            if len(products) >= max_products {
+            if products.__len__() >= max_products {
                 break;
             }
         }
@@ -218,7 +215,6 @@ def fetch_shopify_store(store_url: str, max_products: int = 100) -> list[dict] {
 # ─── Amazon Fetcher ──────────────────────────────────────────────────────────
 
 def fetch_amazon_product(url: str) -> dict {
-    """Fetch an Amazon product page via HTML scraping."""
     html = _fetch_html(url);
     if not html {
         return {"url": url, "platform": "amazon", "source": "page", "title": "", "description": ""};
@@ -264,10 +260,7 @@ def fetch_amazon_product(url: str) -> dict {
     # Fallback: regex extraction
     title = _extract_meta(html, "title");
     if not title {
-        match = re.search(r'<span[^>]*id=["\']productTitle["\'][^>]*>([^<]+)', html);
-        if match {
-            title = match.group(1).strip();
-        }
+        title = "";
     }
 
     description = _extract_meta(html, "description");
@@ -291,7 +284,6 @@ def fetch_amazon_product(url: str) -> dict {
 # ─── Generic Fetcher ─────────────────────────────────────────────────────────
 
 def fetch_generic_product(url: str) -> dict {
-    """Fetch product data from any site using JSON-LD + OpenGraph fallback."""
     html = _fetch_html(url);
     if not html {
         return {"url": url, "platform": "unknown", "source": "page", "title": "", "description": ""};
@@ -352,7 +344,6 @@ def fetch_generic_product(url: str) -> dict {
 # ─── Unified Fetch ───────────────────────────────────────────────────────────
 
 def fetch_product(url: str) -> dict {
-    """Fetch a product from any supported platform. Auto-detects platform."""
     platform = detect_platform(url);
 
     if platform == "shopify" {
@@ -365,7 +356,6 @@ def fetch_product(url: str) -> dict {
 }
 
 def fetch_store(url: str, max_products: int = 100) -> list[dict] {
-    """Fetch all products from a store URL."""
     platform = detect_platform(url);
 
     if platform == "shopify" or is_store_url(url) {

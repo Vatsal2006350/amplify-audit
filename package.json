@@ -12,7 +12,10 @@
     "dev": "tsc --watch",
     "test": "node --test test/*.test.js",
     "prepublishOnly": "npm run build",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "audit": "npm run build && node dist/cli.js",
+    "audit:json": "npm run build && node dist/cli.js --json",
+    "example:library": "npm run build && node examples/devs/library-usage.mjs"
   },
   "keywords": [
     "ecommerce",

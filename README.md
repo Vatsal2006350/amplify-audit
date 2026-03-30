@@ -26,6 +26,39 @@
 
 ---
 
+## 30-Second Overview
+
+- **What is this?** `amplify-audit` is an open-source linter for product pages (PDPs).
+- **Why this matters:** Better listing quality reduces avoidable returns and support tickets.
+- **How to run it:** `npx amplify-audit <product-url>`
+- **What you get:** A quality score, prioritized issues, and concrete listing fixes.
+
+## Golden Demo (Real Run)
+
+```bash
+npx amplify-audit https://allbirds.com/products/mens-tree-runners
+```
+
+```text
+Fetching product data...
+Running quality analysis...
+
+Men's Tree Runner - Jet Black (White Sole)
+Platform: shopify
+https://allbirds.com/products/mens-tree-runners
+
+Quality Score: 64/100  NEEDS WORK
+
+--- Issues Found ---
+  ▲ Title could be longer (42 chars). Optimal is 50-80 characters for SEO.
+  ▲ Description could be more detailed (242 chars). Target 300-1000 characters.
+  ▲ No sizing or fit information found. This is the #1 driver of returns.
+  ○ No material/fabric information detected. Adding materials improves buyer confidence.
+  ○ No care instructions found. Consider adding washing/maintenance info.
+
+Audit complete.
+```
+
 ## Highlights
 
 - **15+ quality checks** across title, description, images, sizing, SEO, price, and trust signals
@@ -45,14 +78,37 @@
 npx amplify-audit https://allbirds.com/products/mens-tree-runners
 ```
 
+Or for local development in this repo:
+
+```bash
+npm install
+npm run audit -- https://allbirds.com/products/mens-tree-runners
+```
+
 ### Jac (Graph-Aware)
 
 ```bash
-pip install jaclang jac-byllm requests
-jac run jac/main.jac https://allbirds.com/products/mens-tree-runners
+pip install -r jac/requirements.txt
+AMPLIFY_AUDIT_URL=https://allbirds.com/products/mens-tree-runners jac run jac/main.jac
 ```
 
 No API keys needed. AI features are opt-in (pass `--ai` with `ANTHROPIC_API_KEY` set).
+
+## Developer Integration
+
+If you are adopting this in a team workflow (services, PR checks, CI gates), use:
+
+- `docs/developer-integration.md` for copy-paste local + CI setup
+- `examples/devs/library-usage.mjs` for programmatic Node usage
+- `examples/devs/returns.sample.json` for realistic returns fixture data
+
+Helpful scripts in this repository:
+
+```bash
+npm run audit -- <product-url>
+npm run audit:json -- <product-url>
+npm run example:library
+```
 
 ## What It Catches
 
@@ -203,6 +259,10 @@ npx amplify-audit https://your-store.com/products/sku-123 --min-score 70 --json
 
 Exits with code 1 if the score is below `--min-score`.
 
+Ready-to-use workflow is included at:
+
+- `.github/workflows/listing-quality-gate.yml`
+
 ```yaml
 # GitHub Actions
 - name: Audit listing quality
@@ -259,22 +319,22 @@ Flat tools analyze each product in isolation and can't see any of this.
 ### Jac Quick Start
 
 ```bash
-pip install jaclang jac-byllm requests
+pip install -r jac/requirements.txt
 
 # Single product
-jac run jac/main.jac https://allbirds.com/products/mens-tree-runners
+AMPLIFY_AUDIT_URL=https://allbirds.com/products/mens-tree-runners jac run jac/main.jac
 
 # Entire store (up to 50 products)
-jac run jac/main.jac https://allbirds.com --store --max 50
+AMPLIFY_AUDIT_URL=https://allbirds.com jac run jac/main.jac --store --max 50
 
 # With AI enrichment
 export ANTHROPIC_API_KEY=sk-ant-...
-jac run jac/main.jac https://allbirds.com/products/mens-tree-runners --ai
+AMPLIFY_AUDIT_URL=https://allbirds.com/products/mens-tree-runners jac run jac/main.jac --ai
 
 # Export
-jac run jac/main.jac https://allbirds.com --store --json -o report.json
-jac run jac/main.jac https://allbirds.com --store --csv -o report.csv
-jac run jac/main.jac https://allbirds.com --store --markdown -o report.md
+AMPLIFY_AUDIT_URL=https://allbirds.com jac run jac/main.jac --store --json -o report.json
+AMPLIFY_AUDIT_URL=https://allbirds.com jac run jac/main.jac --store --csv -o report.csv
+AMPLIFY_AUDIT_URL=https://allbirds.com jac run jac/main.jac --store --markdown -o report.md
 ```
 
 ### Meaning-Typed Programming (No Prompt Engineering)

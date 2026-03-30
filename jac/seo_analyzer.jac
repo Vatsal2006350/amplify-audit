@@ -11,7 +11,7 @@ Evaluates product listings for search engine optimization quality:
 """
 
 import re;
-import from .types { Product, Brand, AuditIssue };
+import from types_jac { Product, Brand, AuditIssue }
 
 # ─── SEO Constants ───────────────────────────────────────────────────────────
 
@@ -42,11 +42,10 @@ glob POWER_WORDS: list[str] = [
 # ─── SEO Analysis Functions ──────────────────────────────────────────────────
 
 def analyze_title_seo(title: str) -> dict {
-    """Analyze title for SEO quality. Returns score and issues."""
     issues: list[dict] = [];
     score = 100;
     words = title.split();
-    char_count = len(title);
+    char_count = title.__len__();
 
     # Length check
     if char_count < SEO_TITLE_MIN {
@@ -66,7 +65,7 @@ def analyze_title_seo(title: str) -> dict {
     }
 
     # Word count (ideal 6-12 words)
-    if len(words) < 4 {
+    if words.__len__() < 4 {
         issues.append({
             "severity": "warning",
             "category": "seo",
@@ -99,7 +98,12 @@ def analyze_title_seo(title: str) -> dict {
     }
 
     # All caps check
-    upper_count = sum(1 for c in title if c.isupper());
+    upper_count = 0;
+    for c in title {
+        if c.isupper() {
+            upper_count += 1;
+        }
+    }
     if char_count > 0 and upper_count / char_count > 0.5 {
         issues.append({
             "severity": "warning",
@@ -122,18 +126,17 @@ def analyze_title_seo(title: str) -> dict {
     # Power words bonus
     lower_title = title.lower();
     power_found = [w for w in POWER_WORDS if w in lower_title];
-    if len(power_found) > 0 {
+    if power_found.__len__() > 0 {
         score = min(100, score + 5);
     }
 
-    return {"score": max(0, score), "issues": issues, "word_count": len(words), "power_words": power_found};
+    return {"score": max(0, score), "issues": issues, "word_count": words.__len__(), "power_words": power_found};
 }
 
 def analyze_description_seo(description: str) -> dict {
-    """Analyze description for SEO keyword richness."""
     issues: list[dict] = [];
     score = 100;
-    char_count = len(description);
+    char_count = description.__len__();
     words = description.split();
 
     if char_count < SEO_DESC_MIN {
@@ -153,7 +156,7 @@ def analyze_description_seo(description: str) -> dict {
             unique_words.add(lower_w);
         }
     }
-    keyword_ratio = len(unique_words) / len(words) if len(words) > 0 else 0;
+    keyword_ratio = unique_words.__len__() / words.__len__() if words.__len__() > 0 else 0;
     if keyword_ratio < 0.3 {
         issues.append({
             "severity": "info",
@@ -185,7 +188,7 @@ def analyze_description_seo(description: str) -> dict {
     return {
         "score": max(0, score),
         "issues": issues,
-        "keyword_count": len(unique_words),
+        "keyword_count": unique_words.__len__(),
         "keyword_ratio": round(keyword_ratio, 2),
         "has_structured_content": has_bullets,
         "has_measurements": has_measurements,
@@ -194,7 +197,6 @@ def analyze_description_seo(description: str) -> dict {
 }
 
 def analyze_url_slug(url: str) -> dict {
-    """Analyze URL slug for SEO quality."""
     issues: list[dict] = [];
     score = 100;
 
@@ -208,11 +210,11 @@ def analyze_url_slug(url: str) -> dict {
     }
 
     # Length check
-    if len(slug) > 75 {
+    if slug.__len__() > 75 {
         issues.append({
             "severity": "info",
             "category": "seo",
-            "message": f"URL slug is long ({len(slug)} chars) — shorter slugs rank better"
+            "message": f"URL slug is long ({slug.__len__()} chars) — shorter slugs rank better"
         });
         score -= 10;
     }
@@ -247,7 +249,7 @@ def compute_seo_score(
     image_count: int,
     tag_count: int
 ) -> dict {
-    """Compute overall SEO score from component analyses."""
+    # Compute overall SEO score from component analyses.
     all_issues: list[dict] = [];
     all_issues.extend(title_result.get("issues", []));
     all_issues.extend(desc_result.get("issues", []));
@@ -281,7 +283,7 @@ def compute_seo_score(
     image_score = min(100, image_count * 20);
     tag_score = min(100, tag_count * 15);
 
-    composite = round(
+    composite = (
         title_result["score"] * title_weight +
         desc_result["score"] * desc_weight +
         url_result["score"] * url_weight +
@@ -303,23 +305,11 @@ def compute_seo_score(
 # ─── SEO Walker ──────────────────────────────────────────────────────────────
 
 walker SEOAnalyzer {
-    """
-    Traverses Product nodes and computes SEO quality scores.
-
-    For each product:
-      1. Analyzes title for keyword optimization
-      2. Analyzes description for keyword richness
-      3. Analyzes URL slug quality
-      4. Checks image and tag counts
-      5. Computes composite SEO score
-      6. Appends SEO-specific issues to the product
-    """
     has analyzed_count: int = 0;
     has seo_results: list[dict] = [];
 
     can start with `root entry {
         visit [-->](`?Product);
-        visit [-->](`?Brand);
     }
 
     can analyze_seo with Product entry {
@@ -331,8 +321,8 @@ walker SEOAnalyzer {
             title_result,
             desc_result,
             url_result,
-            len(here.images),
-            len(here.tags)
+            here.images.__len__(),
+            here.tags.__len__()
         );
 
         # Append SEO issues to product's issue list
@@ -353,12 +343,11 @@ walker SEOAnalyzer {
             "url_score": seo["url_score"],
             "power_words": seo["power_words"],
             "keyword_count": seo["keyword_count"],
-            "issue_count": len(seo["issues"])
+            "issue_count": seo["issues"].__len__()
         };
 
         self.seo_results.append(result);
         self.analyzed_count += 1;
-        report result;
     }
 
     can traverse_brand with Brand entry {
